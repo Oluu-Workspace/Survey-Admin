@@ -3,7 +3,7 @@
  * This file provides a clean interface for both admin dashboard and agent mobile app
  */
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://survey-backend-dkid.onrender.com/api/v1';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
 
 // Types
 export interface User {

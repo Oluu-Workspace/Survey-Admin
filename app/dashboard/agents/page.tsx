@@ -1,6 +1,6 @@
 import { DashboardLayout } from "@/components/layout/dashboard-layout"
 import { ProtectedRoute } from "@/components/auth/protected-route"
-import { AgentManagement } from "@/components/agents/agent-management"
+import { AgentsManagement } from "@/components/agents/agents-management"
 
 export default function AgentsPage() {
   return (
@@ -11,7 +11,7 @@ export default function AgentsPage() {
             <h1 className="text-2xl font-bold text-gray-900">Agent Management</h1>
             <p className="text-gray-600">Manage field agents, invitations, and registrations</p>
           </div>
-          <AgentManagement />
+          <AgentsManagement />
         </div>
       </DashboardLayout>
     </ProtectedRoute>

@@ -1,6 +1,6 @@
 import { DashboardLayout } from "@/components/layout/dashboard-layout"
 import { ProtectedRoute } from "@/components/auth/protected-route"
-import { UserManagement } from "@/components/users/user-management"
+import { UsersManagement } from "@/components/users/users-management"
 
 export default function UsersPage() {
   return (
@@ -11,7 +11,7 @@ export default function UsersPage() {
             <h1 className="text-2xl font-bold text-gray-900">User Management</h1>
             <p className="text-gray-600">Manage admin users and permissions</p>
           </div>
-          <UserManagement />
+          <UsersManagement />
         </div>
       </DashboardLayout>
     </ProtectedRoute>
