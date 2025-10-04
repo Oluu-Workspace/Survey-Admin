@@ -1,0 +1,42 @@
+<svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background with modern gradient -->
+  <rect width="64" height="64" rx="16" fill="url(#bgGradient)"/>
+  
+  <!-- Main "T" letter with modern styling -->
+  <path d="M18 20 L46 20 L46 26 L34 26 L34 44 L30 44 L30 26 L18 26 L18 20 Z" fill="white" stroke="url(#textGradient)" stroke-width="0.5"/>
+  
+  <!-- Survey form elements -->
+  <rect x="48" y="12" width="8" height="1" rx="0.5" fill="#10B981"/>
+  <rect x="48" y="15" width="6" height="1" rx="0.5" fill="#F59E0B"/>
+  <rect x="48" y="18" width="7" height="1" rx="0.5" fill="#EF4444"/>
+  
+  <!-- Data points/analytics -->
+  <circle cx="50" cy="24" r="1.5" fill="#8B5CF6"/>
+  <circle cx="52" cy="26" r="1" fill="#06B6D4"/>
+  <circle cx="49" cy="28" r="1.2" fill="#F97316"/>
+  
+  <!-- Connection network lines -->
+  <path d="M50 24 L46 28" stroke="#8B5CF6" stroke-width="1" opacity="0.6"/>
+  <path d="M52 26 L48 30" stroke="#06B6D4" stroke-width="1" opacity="0.6"/>
+  <path d="M49 28 L45 32" stroke="#F97316" stroke-width="1" opacity="0.6"/>
+  
+  <!-- Kenya map silhouette (simplified) -->
+  <path d="M12 48 Q16 46 20 48 Q24 50 28 48 Q32 46 36 48 Q40 50 44 48 Q48 46 52 48 L52 52 Q48 54 44 52 Q40 50 36 52 Q32 54 28 52 Q24 50 20 52 Q16 54 12 52 Z" fill="url(#kenyaGradient)" opacity="0.3"/>
+  
+  <!-- Gradient definitions -->
+  <defs>
+    <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1E40AF;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#3B82F6;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#60A5FA;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="textGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#F8FAFC;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#E2E8F0;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="kenyaGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#10B981;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#059669;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+</svg>

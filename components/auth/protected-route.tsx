@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useAuth } from "@/hooks/use-auth"
+import { useAuth } from "@/lib/auth"
 import { useEffect } from "react"
 import { useRouter } from "next/navigation"
 
@@ -17,7 +17,7 @@ export function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) 
 
   useEffect(() => {
     if (!isAuthenticated) {
-      router.push("/")
+      router.push("/login")
       return
     }
 

@@ -6,22 +6,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
-import {
-  BarChart,
-  Bar,
-  LineChart,
-  Line,
-  PieChart,
-  Pie,
-  Cell,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  ResponsiveContainer,
-  Area,
-  AreaChart,
-} from "recharts"
 import { TrendingUp, TrendingDown, Users, FileText, Activity, Download } from "lucide-react"
 
 // Mock analytics data
@@ -30,229 +14,197 @@ const responsesByMonth = [
   { month: "Feb", responses: 1450, target: 1200 },
   { month: "Mar", responses: 1680, target: 1400 },
   { month: "Apr", responses: 1920, target: 1600 },
-  { month: "May", responses: 2150, target: 1800 },
-  { month: "Jun", responses: 2380, target: 2000 },
+  { month: "May", responses: 2100, target: 1800 },
+  { month: "Jun", responses: 2350, target: 2000 },
 ]
 
 const responsesByRegion = [
-  { region: "Nairobi", responses: 3245, percentage: 35 },
-  { region: "Kiambu", responses: 2156, percentage: 23 },
-  { region: "Kisumu", responses: 1834, percentage: 20 },
-  { region: "Nakuru", responses: 1245, percentage: 13 },
-  { region: "Meru", responses: 834, percentage: 9 },
+  { region: "Nairobi", responses: 850, percentage: 35 },
+  { region: "Kiambu", responses: 620, percentage: 25 },
+  { region: "Mombasa", responses: 480, percentage: 20 },
+  { region: "Kisumu", responses: 360, percentage: 15 },
+  { region: "Nakuru", responses: 240, percentage: 10 },
 ]
 
-const surveyPerformance = [
-  { survey: "Healthcare Access", responses: 2847, completion: 87, quality: 92 },
-  { survey: "Education Quality", responses: 1956, completion: 78, quality: 85 },
-  { survey: "Agriculture Study", responses: 1234, completion: 92, quality: 88 },
-  { survey: "Water & Sanitation", responses: 2156, completion: 95, quality: 94 },
-]
-
-const enumeratorPerformance = [
-  { name: "Peter Ochieng", responses: 456, quality: 94, regions: 3 },
-  { name: "Grace Muthoni", responses: 423, quality: 91, regions: 2 },
-  { name: "Mary Wanjiku", responses: 398, quality: 89, regions: 4 },
-  { name: "John Kamau", responses: 367, quality: 87, regions: 2 },
-  { name: "Sarah Njeri", responses: 334, quality: 93, regions: 3 },
+const surveyStatusData = [
+  { name: "Active", value: 12, color: "#10B981" },
+  { name: "Completed", value: 8, color: "#3B82F6" },
+  { name: "Draft", value: 3, color: "#F59E0B" },
+  { name: "Paused", value: 2, color: "#EF4444" },
 ]
 
 const responseQualityTrend = [
-  { week: "Week 1", quality: 85, flagged: 12 },
-  { week: "Week 2", quality: 87, flagged: 8 },
-  { week: "Week 3", quality: 89, flagged: 6 },
-  { week: "Week 4", quality: 91, flagged: 4 },
-  { week: "Week 5", quality: 88, flagged: 7 },
-  { week: "Week 6", quality: 92, flagged: 3 },
+  { week: "Week 1", quality: 87.2 },
+  { week: "Week 2", quality: 89.1 },
+  { week: "Week 3", quality: 91.5 },
+  { week: "Week 4", quality: 88.7 },
+  { week: "Week 5", quality: 92.3 },
+  { week: "Week 6", quality: 90.8 },
 ]
 
 const demographicBreakdown = [
-  { category: "18-25", value: 23, color: "#8884d8" },
-  { category: "26-35", value: 32, color: "#82ca9d" },
-  { category: "36-45", value: 28, color: "#ffc658" },
-  { category: "46-55", value: 12, color: "#ff7c7c" },
-  { category: "55+", value: 5, color: "#8dd1e1" },
+  { category: "18-25", value: 25, color: "#3B82F6" },
+  { category: "26-35", value: 35, color: "#10B981" },
+  { category: "36-45", value: 22, color: "#F59E0B" },
+  { category: "46-55", value: 12, color: "#EF4444" },
+  { category: "55+", value: 6, color: "#8B5CF6" },
 ]
 
 export function AnalyticsDashboard() {
-  const [selectedTimeRange, setSelectedTimeRange] = useState("6months")
-  const [selectedSurvey, setSelectedSurvey] = useState("all")
-
-  const totalResponses = responsesByMonth.reduce((sum, month) => sum + month.responses, 0)
-  const avgCompletionRate = Math.round(
-    surveyPerformance.reduce((sum, survey) => sum + survey.completion, 0) / surveyPerformance.length,
-  )
-  const avgQualityScore = Math.round(
-    surveyPerformance.reduce((sum, survey) => sum + survey.quality, 0) / surveyPerformance.length,
-  )
-  const activeEnumerators = enumeratorPerformance.length
+  const [selectedPeriod, setSelectedPeriod] = useState("6months")
+  const [selectedRegion, setSelectedRegion] = useState("all")
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold text-foreground">Analytics Dashboard</h1>
-          <p className="text-muted-foreground">Comprehensive insights and performance metrics</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Select value={selectedTimeRange} onValueChange={setSelectedTimeRange}>
-            <SelectTrigger className="w-32">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="1month">1 Month</SelectItem>
-              <SelectItem value="3months">3 Months</SelectItem>
-              <SelectItem value="6months">6 Months</SelectItem>
-              <SelectItem value="1year">1 Year</SelectItem>
-            </SelectContent>
-          </Select>
-          <Button variant="outline" size="sm">
-            <Download className="h-4 w-4 mr-2" />
-            Export Report
-          </Button>
-        </div>
+      {/* Filters */}
+      <div className="flex flex-col sm:flex-row gap-4">
+        <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
+          <SelectTrigger className="w-full sm:w-48">
+            <SelectValue placeholder="Select period" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="1month">Last Month</SelectItem>
+            <SelectItem value="3months">Last 3 Months</SelectItem>
+            <SelectItem value="6months">Last 6 Months</SelectItem>
+            <SelectItem value="1year">Last Year</SelectItem>
+          </SelectContent>
+        </Select>
+
+        <Select value={selectedRegion} onValueChange={setSelectedRegion}>
+          <SelectTrigger className="w-full sm:w-48">
+            <SelectValue placeholder="Select region" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Regions</SelectItem>
+            <SelectItem value="nairobi">Nairobi</SelectItem>
+            <SelectItem value="kiambu">Kiambu</SelectItem>
+            <SelectItem value="mombasa">Mombasa</SelectItem>
+            <SelectItem value="kisumu">Kisumu</SelectItem>
+          </SelectContent>
+        </Select>
+
+        <Button variant="outline" className="w-full sm:w-auto">
+          <Download className="h-4 w-4 mr-2" />
+          Export Data
+        </Button>
       </div>
 
       {/* Key Metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-              <FileText className="h-4 w-4" />
-              Total Responses
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-semibold">{totalResponses.toLocaleString()}</div>
-            <div className="flex items-center gap-1 text-xs text-green-600">
-              <TrendingUp className="h-3 w-3" />
-              +12.5% from last period
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">Total Responses</p>
+                <p className="text-2xl font-bold">12,450</p>
+                <div className="flex items-center mt-1">
+                  <TrendingUp className="h-3 w-3 text-green-600 mr-1" />
+                  <p className="text-xs text-green-600">+12.5% from last month</p>
+                </div>
+              </div>
+              <FileText className="h-8 w-8 text-blue-600" />
             </div>
           </CardContent>
         </Card>
+
         <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-              <Activity className="h-4 w-4" />
-              Completion Rate
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-semibold">{avgCompletionRate}%</div>
-            <div className="flex items-center gap-1 text-xs text-green-600">
-              <TrendingUp className="h-3 w-3" />
-              +3.2% from last period
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">Active Surveys</p>
+                <p className="text-2xl font-bold">12</p>
+                <div className="flex items-center mt-1">
+                  <TrendingUp className="h-3 w-3 text-green-600 mr-1" />
+                  <p className="text-xs text-green-600">+2 new this week</p>
+                </div>
+              </div>
+              <Activity className="h-8 w-8 text-green-600" />
             </div>
           </CardContent>
         </Card>
+
         <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Quality Score</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-semibold">{avgQualityScore}%</div>
-            <div className="flex items-center gap-1 text-xs text-red-600">
-              <TrendingDown className="h-3 w-3" />
-              -1.1% from last period
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">Field Agents</p>
+                <p className="text-2xl font-bold">45</p>
+                <div className="flex items-center mt-1">
+                  <TrendingUp className="h-3 w-3 text-green-600 mr-1" />
+                  <p className="text-xs text-green-600">+3 new agents</p>
+                </div>
+              </div>
+              <Users className="h-8 w-8 text-purple-600" />
             </div>
           </CardContent>
         </Card>
+
         <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-              <Users className="h-4 w-4" />
-              Active Enumerators
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-semibold">{activeEnumerators}</div>
-            <div className="flex items-center gap-1 text-xs text-green-600">
-              <TrendingUp className="h-3 w-3" />
-              +2 from last period
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">Data Quality</p>
+                <p className="text-2xl font-bold">94.2%</p>
+                <div className="flex items-center mt-1">
+                  <TrendingUp className="h-3 w-3 text-green-600 mr-1" />
+                  <p className="text-xs text-green-600">+2.1% this week</p>
+                </div>
+              </div>
+              <TrendingUp className="h-8 w-8 text-green-600" />
             </div>
           </CardContent>
         </Card>
       </div>
 
+      {/* Analytics Tabs */}
       <Tabs defaultValue="overview" className="space-y-4">
         <TabsList>
           <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="regional">Regional Analysis</TabsTrigger>
           <TabsTrigger value="performance">Performance</TabsTrigger>
-          <TabsTrigger value="quality">Quality Metrics</TabsTrigger>
+          <TabsTrigger value="demographics">Demographics</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="space-y-4">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Response Trends */}
             <Card>
               <CardHeader>
                 <CardTitle>Response Trends</CardTitle>
               </CardHeader>
               <CardContent>
-                <ChartContainer
-                  config={{
-                    responses: {
-                      label: "Responses",
-                      color: "hsl(var(--chart-1))",
-                    },
-                    target: {
-                      label: "Target",
-                      color: "hsl(var(--chart-2))",
-                    },
-                  }}
-                  className="h-80"
-                >
-                  <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={responsesByMonth}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="month" />
-                      <YAxis />
-                      <ChartTooltip content={<ChartTooltipContent />} />
-                      <Area
-                        type="monotone"
-                        dataKey="responses"
-                        stroke="hsl(var(--chart-1))"
-                        fill="hsl(var(--chart-1))"
-                        fillOpacity={0.3}
-                      />
-                      <Line type="monotone" dataKey="target" stroke="hsl(var(--chart-2))" strokeDasharray="5 5" />
-                    </AreaChart>
-                  </ResponsiveContainer>
-                </ChartContainer>
+                <div className="space-y-4">
+                  {responsesByMonth.map((item) => (
+                    <div key={item.month} className="flex items-center justify-between">
+                      <div className="flex items-center space-x-3">
+                        <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
+                        <span className="font-medium">{item.month}</span>
+                      </div>
+                      <div className="text-right">
+                        <div className="font-bold">{item.responses.toLocaleString()}</div>
+                        <div className="text-sm text-gray-500">Target: {item.target.toLocaleString()}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </CardContent>
             </Card>
 
+            {/* Regional Distribution */}
             <Card>
               <CardHeader>
-                <CardTitle>Survey Performance</CardTitle>
+                <CardTitle>Regional Distribution</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {surveyPerformance.map((survey, index) => (
-                    <div key={index} className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium">{survey.survey}</span>
-                        <span className="text-sm text-muted-foreground">{survey.responses} responses</span>
+                  {responsesByRegion.map((item) => (
+                    <div key={item.region} className="flex items-center justify-between">
+                      <div className="flex items-center space-x-3">
+                        <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                        <span className="font-medium">{item.region}</span>
                       </div>
-                      <div className="flex items-center gap-4">
-                        <div className="flex-1">
-                          <div className="flex items-center justify-between text-xs mb-1">
-                            <span>Completion</span>
-                            <span>{survey.completion}%</span>
-                          </div>
-                          <div className="w-full bg-secondary rounded-full h-2">
-                            <div className="bg-primary h-2 rounded-full" style={{ width: `${survey.completion}%` }} />
-                          </div>
-                        </div>
-                        <div className="flex-1">
-                          <div className="flex items-center justify-between text-xs mb-1">
-                            <span>Quality</span>
-                            <span>{survey.quality}%</span>
-                          </div>
-                          <div className="w-full bg-secondary rounded-full h-2">
-                            <div className="bg-chart-2 h-2 rounded-full" style={{ width: `${survey.quality}%` }} />
-                          </div>
-                        </div>
+                      <div className="text-right">
+                        <div className="font-bold">{item.responses.toLocaleString()}</div>
+                        <div className="text-sm text-gray-500">{item.percentage}%</div>
                       </div>
                     </div>
                   ))}
@@ -262,97 +214,57 @@ export function AnalyticsDashboard() {
           </div>
         </TabsContent>
 
-        <TabsContent value="regional" className="space-y-4">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Responses by Region</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ChartContainer
-                  config={{
-                    responses: {
-                      label: "Responses",
-                      color: "hsl(var(--chart-1))",
-                    },
-                  }}
-                  className="h-80"
-                >
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={responsesByRegion} layout="horizontal">
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis type="number" />
-                      <YAxis dataKey="region" type="category" width={80} />
-                      <ChartTooltip content={<ChartTooltipContent />} />
-                      <Bar dataKey="responses" fill="hsl(var(--chart-1))" />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </ChartContainer>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Regional Distribution</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ChartContainer
-                  config={{
-                    percentage: {
-                      label: "Percentage",
-                      color: "hsl(var(--chart-1))",
-                    },
-                  }}
-                  className="h-80"
-                >
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={responsesByRegion}
-                        cx="50%"
-                        cy="50%"
-                        outerRadius={80}
-                        fill="#8884d8"
-                        dataKey="percentage"
-                        label={({ region, percentage }) => `${region}: ${percentage}%`}
-                      >
-                        {responsesByRegion.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={`hsl(var(--chart-${(index % 5) + 1}))`} />
-                        ))}
-                      </Pie>
-                      <ChartTooltip content={<ChartTooltipContent />} />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </ChartContainer>
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-
         <TabsContent value="performance" className="space-y-4">
-          <div className="grid grid-cols-1 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Quality Score Trend */}
             <Card>
               <CardHeader>
-                <CardTitle>Enumerator Performance</CardTitle>
+                <CardTitle>Quality Score Trend</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {enumeratorPerformance.map((enumerator, index) => (
-                    <div key={index} className="flex items-center justify-between p-4 border rounded-lg">
-                      <div className="flex items-center gap-4">
-                        <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
-                          <Users className="h-5 w-5 text-primary" />
-                        </div>
-                        <div>
-                          <div className="font-medium">{enumerator.name}</div>
-                          <div className="text-sm text-muted-foreground">
-                            {enumerator.responses} responses • {enumerator.regions} regions
-                          </div>
-                        </div>
+                  {responseQualityTrend.map((item) => (
+                    <div key={item.week} className="flex items-center justify-between">
+                      <div className="flex items-center space-x-3">
+                        <div className="w-3 h-3 bg-purple-500 rounded-full"></div>
+                        <span className="font-medium">{item.week}</span>
                       </div>
                       <div className="text-right">
-                        <Badge variant={enumerator.quality >= 90 ? "default" : "secondary"}>
-                          {enumerator.quality}% Quality
+                        <div className="font-bold">{item.quality}%</div>
+                        <div className="text-sm text-gray-500">
+                          {item.quality >= 90 ? "Excellent" : item.quality >= 85 ? "Good" : "Needs Improvement"}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Survey Status */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Survey Status</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {surveyStatusData.map((item) => (
+                    <div key={item.name} className="flex items-center justify-between">
+                      <div className="flex items-center space-x-3">
+                        <div 
+                          className="w-3 h-3 rounded-full" 
+                          style={{ backgroundColor: item.color }}
+                        ></div>
+                        <span className="font-medium">{item.name}</span>
+                      </div>
+                      <div className="text-right">
+                        <div className="font-bold">{item.value}</div>
+                        <Badge 
+                          variant="secondary" 
+                          className="text-xs"
+                          style={{ backgroundColor: item.color + "20", color: item.color }}
+                        >
+                          {item.name}
                         </Badge>
                       </div>
                     </div>
@@ -363,68 +275,76 @@ export function AnalyticsDashboard() {
           </div>
         </TabsContent>
 
-        <TabsContent value="quality" className="space-y-4">
+        <TabsContent value="demographics" className="space-y-4">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Age Distribution */}
             <Card>
               <CardHeader>
-                <CardTitle>Quality Score Trend</CardTitle>
+                <CardTitle>Age Distribution</CardTitle>
               </CardHeader>
               <CardContent>
-                <ChartContainer
-                  config={{
-                    quality: {
-                      label: "Quality Score",
-                      color: "hsl(var(--chart-1))",
-                    },
-                  }}
-                  className="h-80"
-                >
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={responseQualityTrend}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="week" />
-                      <YAxis domain={[80, 95]} />
-                      <ChartTooltip content={<ChartTooltipContent />} />
-                      <Line type="monotone" dataKey="quality" stroke="hsl(var(--chart-1))" strokeWidth={2} />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </ChartContainer>
+                <div className="space-y-4">
+                  {demographicBreakdown.map((item) => (
+                    <div key={item.category} className="flex items-center justify-between">
+                      <div className="flex items-center space-x-3">
+                        <div 
+                          className="w-3 h-3 rounded-full" 
+                          style={{ backgroundColor: item.color }}
+                        ></div>
+                        <span className="font-medium">{item.category} years</span>
+                      </div>
+                      <div className="text-right">
+                        <div className="font-bold">{item.value}%</div>
+                        <div className="text-sm text-gray-500">
+                          {item.value >= 30 ? "Majority" : item.value >= 20 ? "Significant" : "Minority"}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </CardContent>
             </Card>
 
+            {/* Summary Stats */}
             <Card>
               <CardHeader>
-                <CardTitle>Demographic Breakdown</CardTitle>
+                <CardTitle>Summary Statistics</CardTitle>
               </CardHeader>
               <CardContent>
-                <ChartContainer
-                  config={{
-                    value: {
-                      label: "Percentage",
-                      color: "hsl(var(--chart-1))",
-                    },
-                  }}
-                  className="h-80"
-                >
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={demographicBreakdown}
-                        cx="50%"
-                        cy="50%"
-                        outerRadius={80}
-                        fill="#8884d8"
-                        dataKey="value"
-                        label={({ category, value }) => `${category}: ${value}%`}
-                      >
-                        {demographicBreakdown.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.color} />
-                        ))}
-                      </Pie>
-                      <ChartTooltip content={<ChartTooltipContent />} />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </ChartContainer>
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
+                    <div>
+                      <p className="font-medium text-sm">Average Response Time</p>
+                      <p className="text-xs text-gray-600">Time to complete surveys</p>
+                    </div>
+                    <div className="text-right">
+                      <div className="font-bold">8.5 min</div>
+                      <div className="text-xs text-green-600">-0.3 min</div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg">
+                    <div>
+                      <p className="font-medium text-sm">Completion Rate</p>
+                      <p className="text-xs text-gray-600">Surveys completed vs started</p>
+                    </div>
+                    <div className="text-right">
+                      <div className="font-bold">87.3%</div>
+                      <div className="text-xs text-green-600">+2.1%</div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between p-3 bg-purple-50 rounded-lg">
+                    <div>
+                      <p className="font-medium text-sm">Data Validation</p>
+                      <p className="text-xs text-gray-600">Automated quality checks</p>
+                    </div>
+                    <div className="text-right">
+                      <div className="font-bold">94.2%</div>
+                      <div className="text-xs text-green-600">+1.8%</div>
+                    </div>
+                  </div>
+                </div>
               </CardContent>
             </Card>
           </div>
