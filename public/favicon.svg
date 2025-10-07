@@ -1,25 +1,6 @@
 <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <!-- Background with modern gradient -->
-  <rect width="32" height="32" rx="8" fill="url(#bgGradient)"/>
-  
-  <!-- Main "T" letter with modern styling -->
-  <path d="M9 10 L23 10 L23 13 L17 13 L17 22 L15 22 L15 13 L9 13 L9 10 Z" fill="white"/>
-  
-  <!-- Survey form elements -->
-  <rect x="24" y="6" width="4" height="0.5" rx="0.25" fill="#10B981"/>
-  <rect x="24" y="7.5" width="3" height="0.5" rx="0.25" fill="#F59E0B"/>
-  <rect x="24" y="9" width="3.5" height="0.5" rx="0.25" fill="#EF4444"/>
-  
-  <!-- Data points -->
-  <circle cx="25" cy="12" r="0.75" fill="#8B5CF6"/>
-  <circle cx="26" cy="13" r="0.5" fill="#06B6D4"/>
-  
-  <!-- Gradient definitions -->
-  <defs>
-    <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#1E40AF;stop-opacity:1" />
-      <stop offset="50%" style="stop-color:#3B82F6;stop-opacity:1" />
-      <stop offset="100%" style="stop-color:#60A5FA;stop-opacity:1" />
-    </linearGradient>
-  </defs>
+  <rect width="32" height="32" rx="8" fill="#1e40af"/>
+  <path d="M8 12L16 6L24 12V24C24 25.1046 23.1046 26 22 26H10C8.89543 26 8 25.1046 8 24V12Z" fill="white"/>
+  <circle cx="16" cy="18" r="3" fill="#1e40af"/>
+  <path d="M13 21L16 18L19 21" stroke="#1e40af" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>
