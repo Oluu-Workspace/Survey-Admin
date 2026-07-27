@@ -36,12 +36,6 @@ const Login = () => {
     }
   };
 
-  // Temporary bypass for testing - remove in production
-  const handleTestLogin = () => {
-    localStorage.setItem('auth_token', 'test-token');
-    navigate('/dashboard');
-  };
-
   return (
     <div className="min-h-screen flex items-center justify-center bg-background relative">
       {/* Theme Toggle - Top Right */}
@@ -118,17 +112,6 @@ const Login = () => {
               >
                 <Settings className="mr-2 h-4 w-4" />
                 {showConnectionTest ? 'Hide' : 'Test'} Backend Connection
-              </Button>
-              
-              {/* Temporary test login button - remove in production */}
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="w-full"
-                onClick={handleTestLogin}
-              >
-                Test Login (Bypass)
               </Button>
             </div>
           </CardContent>

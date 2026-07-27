@@ -7,13 +7,13 @@ import { ThemeProvider } from "@/hooks/use-theme";
 import Landing from "./pages/Landing";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
+import DataExplorer from "./pages/DataExplorer";
+import ReviewWorkspace from "./pages/ReviewWorkspace";
+import ProjectDetail from "./pages/ProjectDetail";
+import Projects from "./pages/Projects";
 import Agents from "./pages/Agents";
 import Surveys from "./pages/Surveys";
-import Analytics from "./pages/Analytics";
-import DataManagement from "./pages/DataManagement";
-import ExportCenter from "./pages/ExportCenter";
-import RegionalAssignment from "./pages/RegionalAssignment";
-import SystemManagement from "./pages/SystemManagement";
+import SurveyDetail from "./pages/SurveyDetail";
 import NotFound from "./pages/NotFound";
 import { DashboardLayout } from "./components/layout/DashboardLayout";
 
@@ -28,7 +28,7 @@ const App = () => (
         <BrowserRouter
           future={{
             v7_startTransition: true,
-            v7_relativeSplatPath: true
+            v7_relativeSplatPath: true,
           }}
         >
           <Routes>
@@ -36,13 +36,13 @@ const App = () => (
             <Route path="/login" element={<Login />} />
             <Route path="/dashboard" element={<DashboardLayout />}>
               <Route index element={<Dashboard />} />
+              <Route path="data" element={<DataExplorer />} />
+              <Route path="review" element={<ReviewWorkspace />} />
+              <Route path="projects" element={<Projects />} />
+              <Route path="projects/:projectId" element={<ProjectDetail />} />
               <Route path="agents" element={<Agents />} />
               <Route path="surveys" element={<Surveys />} />
-              <Route path="analytics" element={<Analytics />} />
-              <Route path="data" element={<DataManagement />} />
-              <Route path="export" element={<ExportCenter />} />
-              <Route path="regions" element={<RegionalAssignment />} />
-              <Route path="system" element={<SystemManagement />} />
+              <Route path="surveys/:surveyId" element={<SurveyDetail />} />
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>

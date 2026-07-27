@@ -1,73 +1,31 @@
-# Welcome to your Lovable project
+# Tafiti Admin (`tafiti-survey-platform`)
 
-## Project info
+**This is the research admin dashboard** — not the field agent app.
 
-**URL**: https://lovable.dev/projects/bba7b3ef-dc5c-4975-b579-99e38258ede7
+| App | Folder | Who uses it |
+|-----|--------|-------------|
+| **Tafiti Admin** | `Survey-Admin` (this repo) | Researchers / admins in the browser |
+| **Tafiti** (PWA) | `field-data-studio` | Field agents on phones |
+| **API** | `Survey-Backend` | Flask on port 5000 (or Render) |
 
-## How can I edit this code?
+## Typical admin workflow
 
-There are several ways of editing your application.
+1. **Research home** (`/dashboard`) — totals and survey list  
+2. **Surveys** — create / activate studies, assign agents, edit questions  
+3. Open a survey → **Overview → Data → Analysis → Report** (tabs on the survey page)  
+4. **Data explorer** — same response tables, pick a survey from the grid  
+5. **Review queue** — quality / lifecycle review  
 
-**Use Lovable**
-
-Simply visit the [Lovable Project](https://lovable.dev/projects/bba7b3ef-dc5c-4975-b579-99e38258ede7) and start prompting.
-
-Changes made via Lovable will be committed automatically to this repo.
-
-**Use your preferred IDE**
-
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
+## Local dev
 
 ```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
 npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
+# Point at API (see .env)
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+Default admin login (mock backend): `admin@surveypro.ke` / `admin123`
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+## Env
 
-**Use GitHub Codespaces**
-
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
-
-## What technologies are used for this project?
-
-This project is built with:
-
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
-
-## How can I deploy this project?
-
-Simply open [Lovable](https://lovable.dev/projects/bba7b3ef-dc5c-4975-b579-99e38258ede7) and click on Share -> Publish.
-
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+`VITE_API_BASE_URL=http://localhost:5000/api/v1`

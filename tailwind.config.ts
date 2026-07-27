@@ -13,6 +13,11 @@ export default {
       },
     },
     extend: {
+      fontFamily: {
+        display: ["Instrument Sans", "Source Sans 3", "system-ui", "sans-serif"],
+        sans: ["Source Sans 3", "system-ui", "sans-serif"],
+        mono: ["IBM Plex Mono", "ui-monospace", "monospace"],
+      },
       colors: {
         border: "var(--border)",
         input: "var(--input)",
@@ -30,6 +35,10 @@ export default {
         destructive: {
           DEFAULT: "var(--destructive)",
           foreground: "var(--destructive-foreground)",
+        },
+        flagged: {
+          DEFAULT: "var(--flagged)",
+          foreground: "var(--flagged-foreground)",
         },
         warning: {
           DEFAULT: "var(--warning)",
@@ -71,12 +80,8 @@ export default {
       },
       borderRadius: {
         lg: "var(--radius)",
-        md: "calc(var(--radius) - 2px)",
-        sm: "calc(var(--radius) - 4px)",
-      },
-      fontFamily: {
-        sans: ["Geist Sans", "system-ui", "sans-serif"],
-        mono: ["Geist Mono", "Fira Code", "monospace"],
+        md: "calc(var(--radius) - 1px)",
+        sm: "calc(var(--radius) - 2px)",
       },
       keyframes: {
         "accordion-down": {

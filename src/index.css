@@ -2,7 +2,7 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Survey Research Platform Design System - OKLCH Color Space */
+/* Survey Research Platform Design System - OKLCH Color Space (public pages) */
 
 @layer base {
   :root {
@@ -13,44 +13,44 @@
     --card-foreground: oklch(0.145 0 0);
     --popover: oklch(1 0 0);
     --popover-foreground: oklch(0.145 0 0);
-    
+
     /* Primary Colors */
     --primary: oklch(0.205 0 0);
     --primary-foreground: oklch(0.985 0 0);
-    
+
     /* Secondary Colors */
     --secondary: oklch(0.97 0 0);
     --secondary-foreground: oklch(0.205 0 0);
-    
+
     /* Muted Colors */
     --muted: oklch(0.97 0 0);
     --muted-foreground: oklch(0.556 0 0);
-    
+
     /* Accent Colors */
     --accent: oklch(0.97 0 0);
     --accent-foreground: oklch(0.205 0 0);
-    
+
     /* Status Colors */
     --destructive: oklch(0.577 0.245 27.325);
     --destructive-foreground: oklch(0.577 0.245 27.325);
     --warning: oklch(0.828 0.189 84.429);
     --warning-foreground: oklch(0.145 0 0);
-    
+
     /* Border & Input */
     --border: oklch(0.922 0 0);
     --input: oklch(0.922 0 0);
     --ring: oklch(0.708 0 0);
-    
+
     /* Chart Colors */
     --chart-1: oklch(0.646 0.222 41.116);
     --chart-2: oklch(0.6 0.118 184.704);
     --chart-3: oklch(0.398 0.07 227.392);
     --chart-4: oklch(0.828 0.189 84.429);
     --chart-5: oklch(0.769 0.188 70.08);
-    
+
     /* Layout */
     --radius: 0.625rem;
-    
+
     /* Sidebar Colors */
     --sidebar-background: oklch(0.985 0 0);
     --sidebar-foreground: oklch(0.145 0 0);
@@ -60,6 +60,10 @@
     --sidebar-accent-foreground: oklch(0.205 0 0);
     --sidebar-border: oklch(0.922 0 0);
     --sidebar-ring: oklch(0.708 0 0);
+
+    --font-display: inherit;
+    --font-body: inherit;
+    --font-mono: ui-monospace, monospace;
   }
 
   .dark {
@@ -70,41 +74,41 @@
     --card-foreground: oklch(0.985 0 0);
     --popover: oklch(0.145 0 0);
     --popover-foreground: oklch(0.985 0 0);
-    
+
     /* Primary Colors */
     --primary: oklch(0.985 0 0);
     --primary-foreground: oklch(0.205 0 0);
-    
+
     /* Secondary Colors */
     --secondary: oklch(0.269 0 0);
     --secondary-foreground: oklch(0.985 0 0);
-    
+
     /* Muted Colors */
     --muted: oklch(0.269 0 0);
     --muted-foreground: oklch(0.708 0 0);
-    
+
     /* Accent Colors */
     --accent: oklch(0.269 0 0);
     --accent-foreground: oklch(0.985 0 0);
-    
+
     /* Status Colors */
     --destructive: oklch(0.396 0.141 25.723);
     --destructive-foreground: oklch(0.637 0.237 25.331);
     --warning: oklch(0.769 0.188 70.08);
     --warning-foreground: oklch(0.145 0 0);
-    
+
     /* Border & Input */
     --border: oklch(0.269 0 0);
     --input: oklch(0.269 0 0);
     --ring: oklch(0.439 0 0);
-    
+
     /* Chart Colors */
     --chart-1: oklch(0.488 0.243 264.376);
     --chart-2: oklch(0.696 0.17 162.48);
     --chart-3: oklch(0.769 0.188 70.08);
     --chart-4: oklch(0.627 0.265 303.9);
     --chart-5: oklch(0.645 0.246 16.439);
-    
+
     /* Sidebar Colors */
     --sidebar-background: oklch(0.205 0 0);
     --sidebar-foreground: oklch(0.985 0 0);
@@ -115,14 +119,182 @@
     --sidebar-border: oklch(0.269 0 0);
     --sidebar-ring: oklch(0.439 0 0);
   }
-}
 
-@layer base {
+  /* Admin dashboard only — field ledger palette */
+  .admin-ledger {
+    --background: #eef2f5;
+    --foreground: #1a2838;
+    --card: #ffffff;
+    --card-foreground: #1a2838;
+    --popover: #ffffff;
+    --popover-foreground: #1a2838;
+
+    --primary: #1b4d3e;
+    --primary-foreground: #f4f7f5;
+
+    --secondary: #e4e9ef;
+    --secondary-foreground: #1a2838;
+
+    --muted: #e8edf2;
+    --muted-foreground: #5a6b7d;
+
+    --accent: #e4e9ef;
+    --accent-foreground: #1a2838;
+
+    --destructive: #8b3a2f;
+    --destructive-foreground: #faf6f4;
+
+    --flagged: #a67c52;
+    --flagged-foreground: #faf6f4;
+
+    --warning: #a67c52;
+    --warning-foreground: #1a2838;
+
+    --border: #d3dae3;
+    --input: #d3dae3;
+    --ring: #1b4d3e;
+
+    --chart-1: #1b4d3e;
+    --chart-2: #3d6b5c;
+    --chart-3: #5a6b7d;
+    --chart-4: #a67c52;
+    --chart-5: #2c3e50;
+
+    --radius: 0.25rem;
+
+    --sidebar-background: #f7f9fb;
+    --sidebar-foreground: #1a2838;
+    --sidebar-primary: #1b4d3e;
+    --sidebar-primary-foreground: #f4f7f5;
+    --sidebar-accent: #e8edf2;
+    --sidebar-accent-foreground: #1a2838;
+    --sidebar-border: #d3dae3;
+    --sidebar-ring: #1b4d3e;
+
+    --font-display: "Instrument Sans", "Source Sans 3", system-ui, sans-serif;
+    --font-body: "Source Sans 3", system-ui, sans-serif;
+    --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+
+    color: var(--foreground);
+    background-color: var(--background);
+    font-family: var(--font-body);
+    font-feature-settings: "kern" 1, "liga" 1;
+  }
+
+  .admin-ledger h1,
+  .admin-ledger h2,
+  .admin-ledger h3,
+  .admin-ledger .font-display {
+    font-family: var(--font-display);
+    letter-spacing: -0.01em;
+  }
+
+  .admin-ledger .font-mono,
+  .admin-ledger .tabular-nums {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+  }
+
   * {
     @apply border-border;
   }
 
   body {
     @apply bg-background text-foreground;
+  }
+}
+
+@layer components {
+  .stamp {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1.5px solid currentColor;
+    border-radius: 2px;
+    padding: 0.15rem 0.45rem;
+    font-family: var(--font-display);
+    font-size: 0.65rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    line-height: 1.2;
+    text-transform: uppercase;
+    white-space: nowrap;
+    background: transparent;
+  }
+
+  .stamp-active {
+    color: #1b4d3e;
+    border-color: #1b4d3e;
+  }
+
+  .stamp-draft,
+  .stamp-waiting {
+    color: #5a6b7d;
+    border-color: #8a98a8;
+  }
+
+  .stamp-closed,
+  .stamp-suspended {
+    color: #5a6b7d;
+    border-color: #5a6b7d;
+    opacity: 0.85;
+  }
+
+  .stamp-collecting {
+    color: #2c4a6e;
+    border-color: #2c4a6e;
+  }
+
+  .stamp-synced {
+    color: #1b4d3e;
+    border-color: #1b4d3e;
+  }
+
+  .stamp-approved {
+    color: #1b4d3e;
+    border-color: #1b4d3e;
+  }
+
+  .stamp-flagged {
+    color: #a67c52;
+    border-color: #a67c52;
+  }
+
+  .stamp-pending {
+    color: #2c4a6e;
+    border-color: #2c4a6e;
+  }
+
+  .ledger-count {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.02em;
+  }
+
+  .ledger-table {
+    @apply w-full border-collapse text-sm;
+  }
+
+  .ledger-table th {
+    @apply border-b border-border px-3 py-2.5 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground;
+    background-color: color-mix(in srgb, var(--muted) 40%, transparent);
+    font-family: var(--font-display);
+  }
+
+  .ledger-table td {
+    @apply border-b border-border px-3 py-3 align-middle;
+  }
+
+  .ledger-table tr:last-child td {
+    @apply border-b-0;
+  }
+
+  .ledger-table tbody tr {
+    @apply bg-card;
+    transition: background-color 0.15s ease;
+  }
+
+  .ledger-table tbody tr:hover {
+    background-color: color-mix(in srgb, var(--muted) 30%, transparent);
   }
 }

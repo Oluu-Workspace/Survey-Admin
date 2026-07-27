@@ -1,5 +1,6 @@
 import axios from 'axios';
 import type { AuthResponse, User, DashboardStats } from '@/types';
+import { mapResponseFromApi } from '@/domain/response';
 
 // Use environment variable or fallback to remote backend
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://survey-backend-dkid.onrender.com/api/v1';
@@ -50,23 +51,8 @@ export const authAPI = {
   },
   
   me: async (): Promise<User> => {
-    try {
-      const { data } = await api.get('/auth/profile');
-      return data;
-    } catch (error) {
-      // If profile endpoint doesn't exist, return mock user data
-      console.warn('Profile endpoint not available, using mock data');
-      return {
-        id: '1',
-        email: 'admin@example.com',
-        first_name: 'Admin',
-        last_name: 'User',
-        role: 'admin',
-        status: 'active',
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      };
-    }
+    const { data } = await api.get('/auth/profile');
+    return data;
   },
   
   logout: async (): Promise<void> => {
@@ -75,6 +61,25 @@ export const authAPI = {
   
   refresh: async (): Promise<{ access_token: string }> => {
     const { data } = await api.post('/auth/refresh');
+    return data;
+  },
+};
+
+export const projectsAPI = {
+  getAll: async (params?: { status?: string }) => {
+    const { data } = await api.get('/projects', { params });
+    return data;
+  },
+  getById: async (id: string) => {
+    const { data } = await api.get(`/projects/${id}`);
+    return data;
+  },
+  create: async (payload: Record<string, unknown>) => {
+    const { data } = await api.post('/projects', payload);
+    return data;
+  },
+  update: async (id: string, payload: Record<string, unknown>) => {
+    const { data } = await api.put(`/projects/${id}`, payload);
     return data;
   },
 };
@@ -117,8 +122,13 @@ export const agentsAPI = {
 };
 
 export const surveysAPI = {
-  getAll: async (params?: { page?: number; limit?: number; status?: string }) => {
-    const { data } = await api.get('/surveys', { params });
+  getAll: async (params?: { page?: number; limit?: number; per_page?: number; status?: string }) => {
+    const { data } = await api.get('/surveys', {
+      params: {
+        ...params,
+        per_page: params?.per_page ?? params?.limit,
+      },
+    });
     return data;
   },
   
@@ -146,7 +156,20 @@ export const surveysAPI = {
     const { data } = await api.post(`/surveys/${id}/assign`, { agent_ids: agentIds });
     return data;
   },
+
+  getAnalytics: async (
+    id: string,
+    params?: { agent_id?: string; compare_by?: string },
+  ) => {
+    const { data } = await api.get(`/surveys/${id}/analytics`, { params });
+    return data;
+  },
   
+  getInsights: async (id: string, params?: { agent_id?: string }) => {
+    const { data } = await api.get(`/surveys/${id}/insights`, { params });
+    return data;
+  },
+
   getStats: async () => {
     const { data } = await api.get('/surveys/stats');
     return data;
@@ -154,14 +177,37 @@ export const surveysAPI = {
 };
 
 export const responsesAPI = {
-  getAll: async (params?: { page?: number; limit?: number; survey_id?: string }) => {
-    const { data } = await api.get('/responses', { params });
-    return data;
+  getAll: async (params?: {
+    page?: number;
+    limit?: number;
+    per_page?: number;
+    survey_id?: string;
+    agent_id?: string;
+    status?: string;
+    lifecycle_stage?: string;
+    county?: string;
+    ward?: string;
+    search?: string;
+    q?: string;
+    sort_by?: string;
+    sort_order?: 'asc' | 'desc';
+  }) => {
+    const { data } = await api.get('/responses', {
+      params: {
+        ...params,
+        per_page: params?.per_page ?? params?.limit,
+      },
+    });
+    const responses = (data.responses || []).map((r: Record<string, unknown>) =>
+      mapResponseFromApi(r),
+    );
+    return { ...data, responses };
   },
   
   getById: async (id: string) => {
     const { data } = await api.get(`/responses/${id}`);
-    return data;
+    const raw = data.response || data;
+    return { ...data, response: mapResponseFromApi(raw) };
   },
   
   submit: async (responseData: any) => {
@@ -169,7 +215,16 @@ export const responsesAPI = {
     return data;
   },
   
-  validate: async (id: string, validationData: { is_valid: boolean; notes?: string }) => {
+  validate: async (
+    id: string,
+    validationData: {
+      is_valid?: boolean;
+      status?: string;
+      flag?: boolean;
+      notes?: string;
+      validation_notes?: string;
+    },
+  ) => {
     const { data } = await api.post(`/responses/${id}/validate`, validationData);
     return data;
   },
@@ -198,6 +253,28 @@ export const analyticsAPI = {
   
   getSurveyCompletion: async () => {
     const { data } = await api.get('/analytics/survey-completion');
+    return data;
+  },
+};
+
+export const operationsAPI = {
+  getDashboard: async () => {
+    const { data } = await api.get('/analytics/operations');
+    if (data.recent_activity) {
+      data.recent_activity = data.recent_activity.map((r: Record<string, unknown>) =>
+        mapResponseFromApi(r),
+      );
+    }
+    if (data.last_hour_activity) {
+      data.last_hour_activity = data.last_hour_activity.map((r: Record<string, unknown>) =>
+        mapResponseFromApi(r),
+      );
+    }
+    if (data.quality_alerts) {
+      data.quality_alerts = data.quality_alerts.map((r: Record<string, unknown>) =>
+        mapResponseFromApi(r),
+      );
+    }
     return data;
   },
 };
