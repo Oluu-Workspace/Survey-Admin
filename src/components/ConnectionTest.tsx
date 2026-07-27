@@ -18,11 +18,11 @@ export function ConnectionTest() {
       const response = await healthAPI.check();
       setStatus('success');
       setMessage(`Connected successfully! Backend is running.`);
-      setApiUrl(import.meta.env.VITE_API_BASE_URL || 'https://survey-backend-dkid.onrender.com/api/v1');
+      setApiUrl(import.meta.env.VITE_API_BASE_URL || 'https://survey-backend.project360.space/api/v1');
     } catch (error: any) {
       setStatus('error');
       setMessage(`Connection failed: ${error.response?.data?.error || error.message || 'Unknown error'}`);
-      setApiUrl(import.meta.env.VITE_API_BASE_URL || 'https://survey-backend-dkid.onrender.com/api/v1');
+      setApiUrl(import.meta.env.VITE_API_BASE_URL || 'https://survey-backend.project360.space/api/v1');
     }
   };
 

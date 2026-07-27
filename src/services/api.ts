@@ -3,7 +3,7 @@ import type { AuthResponse, User, DashboardStats } from '@/types';
 import { mapResponseFromApi } from '@/domain/response';
 
 // Use environment variable or fallback to remote backend
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://survey-backend-dkid.onrender.com/api/v1';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://survey-backend.project360.space/api/v1';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
