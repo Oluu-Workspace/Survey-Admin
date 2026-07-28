@@ -1,4 +1,5 @@
 import type { SurveyQuestion } from './questions';
+import { downloadText, openHtmlInNewTabOrDownload, type OpenHtmlReportResult } from './download';
 
 export type ResponseLike = {
   id: string;
@@ -231,7 +232,7 @@ export function openPrintableReport(opts: {
   executiveSummary?: string[];
   conclusions?: string[];
   questionInsights?: Record<string, string>;
-}) {
+}): OpenHtmlReportResult {
   const { surveyTitle, area, generatedAt, bundle, executiveSummary, conclusions, questionInsights } =
     opts;
   const bars = (items: { option: string; count: number; pct: number }[]) =>
@@ -359,15 +360,15 @@ export function openPrintableReport(opts: {
     )
     .join('') || '<tr><td colspan="4" class="meta">No data</td></tr>'}</tbody></table>
   <script>
-    // Page numbers via CSS is limited; print dialog "headers and footers" covers Page X of Y in most browsers.
     document.title = ${JSON.stringify(surveyTitle + ' — Report')};
+    window.addEventListener('load', function () {
+      setTimeout(function () { try { window.print(); } catch (e) {} }, 500);
+    });
   </script>
 </body></html>`;
 
-  const w = window.open('', '_blank');
-  if (!w) return;
-  w.document.write(html);
-  w.document.close();
+  const safeName = (surveyTitle || 'survey').replace(/\s+/g, '_').toLowerCase();
+  return openHtmlInNewTabOrDownload(html, `${safeName}_research_report`);
 }
 
 function escapeHtml(s: string) {
@@ -396,7 +397,7 @@ export function exportResponsesCsv(
     const cells = [
       respondentCode(r, i),
       r.status || 'submitted',
-      r.agent_id,
+      String(r.agent_id ?? ''),
       r.location?.ward || '',
       r.location?.village || '',
       r.created_at || r.submitted_at || '',
@@ -406,17 +407,11 @@ export function exportResponsesCsv(
         return v == null ? '' : String(v);
       }),
     ];
-    return cells.map(csvEscape).join(',');
+    return cells.map((c) => csvEscape(String(c))).join(',');
   });
-  const blob = new Blob([[headers.join(','), ...rows].join('\n')], {
-    type: 'text/csv;charset=utf-8',
-  });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `${surveyTitle.replace(/\s+/g, '_').toLowerCase()}_data.csv`;
-  a.click();
-  URL.revokeObjectURL(url);
+  const csv = [headers.map((h) => csvEscape(h)).join(','), ...rows].join('\r\n');
+  const filename = `${surveyTitle.replace(/\s+/g, '_').toLowerCase()}_data.csv`;
+  downloadText(csv, filename, 'text/csv;charset=utf-8', true);
 }
 
 function csvEscape(s: string) {

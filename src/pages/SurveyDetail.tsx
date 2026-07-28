@@ -281,9 +281,9 @@ const SurveyDetail = () => {
       ).QuestionAnalytics[];
       const questionInsights: Record<string, string> = {};
       for (const q of perQ) {
-        questionInsights[q.id] = generateQuestionInsight(q);
+        if (q?.id) questionInsights[q.id] = generateQuestionInsight(q);
       }
-      openPrintableReport({
+      const result = openPrintableReport({
         surveyTitle: survey.title || 'Survey',
         area: [survey.ward, survey.village].filter(Boolean).join(' · ') || 'All areas',
         generatedAt: new Date().toLocaleString(),
@@ -298,8 +298,19 @@ const SurveyDetail = () => {
         conclusions: buildConclusions(perQ),
         questionInsights,
       });
-    } catch {
-      toast.error('Could not build report');
+      if (result.mode === 'download') {
+        toast.success(`Popups blocked — downloaded ${result.filename}. Open it and use Print → Save as PDF.`);
+      } else {
+        toast.success('Report opened — use Print → Save as PDF if the dialog did not appear.');
+      }
+    } catch (err: unknown) {
+      const msg =
+        err && typeof err === 'object' && 'response' in err
+          ? String((err as { response?: { data?: { error?: string } } }).response?.data?.error)
+          : err instanceof Error
+            ? err.message
+            : 'Unknown error';
+      toast.error(msg ? `Could not build report: ${msg}` : 'Could not build report');
     } finally {
       setExportBusy(false);
     }
@@ -311,9 +322,10 @@ const SurveyDetail = () => {
       toast.message('Exporting CSV…');
       const rows = await fetchAllSurveyResponses(surveyId);
       exportResponsesCsv(survey.title || 'survey', questions, rows);
-      toast.success(`Exported ${rows.length} rows`);
-    } catch {
-      toast.error('Export failed');
+      toast.success(`Downloaded CSV (${rows.length} rows)`);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Export failed';
+      toast.error(msg);
     } finally {
       setExportBusy(false);
     }

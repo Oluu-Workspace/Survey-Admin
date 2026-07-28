@@ -1,5 +1,6 @@
 import type { LifecycleStage, ResponseStatus } from './enums';
 import { normalizeLocation, type AdminLocation } from './location';
+import { downloadText } from '@/lib/download';
 
 export type Respondent = {
   name: string;
@@ -139,11 +140,5 @@ export function exportResponsesCsv(rows: SurveyResponse[], filename: string) {
     ].map((c) => `"${String(c).replace(/"/g, '""')}"`);
     lines.push(cells.join(','));
   }
-  const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(url);
+  downloadText(lines.join('\r\n'), filename, 'text/csv;charset=utf-8', true);
 }
