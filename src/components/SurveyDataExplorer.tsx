@@ -103,7 +103,16 @@ function persistViews(views: SavedView[]) {
   localStorage.setItem(VIEWS_KEY, JSON.stringify(views));
 }
 
-const defaultVisible: ColumnKey[] = ALL_COLUMNS.map((c) => c.key);
+const defaultVisible: ColumnKey[] = [
+  'gender',
+  'age',
+  'county',
+  'subcounty',
+  'ward',
+  'village',
+  'agent',
+  'submitted',
+];
 
 export type SurveyDataExplorerProps = {
   surveyId: string;

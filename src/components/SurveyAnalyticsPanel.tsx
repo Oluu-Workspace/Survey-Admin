@@ -43,6 +43,7 @@ export type QuestionAnalytics = {
   type?: string;
   kind: 'choice' | 'number' | 'text' | 'media';
   chart?: 'donut' | 'pie' | 'bar' | 'histogram' | 'none';
+  chartable?: boolean;
   count: number;
   min?: number | null;
   max?: number | null;

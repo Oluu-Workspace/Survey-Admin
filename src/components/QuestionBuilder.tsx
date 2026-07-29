@@ -5,6 +5,7 @@ import {
   type QuestionType,
   type SurveyQuestion,
 } from '@/lib/questions';
+import { COMMON_KNOWLEDGE_PRESETS } from '@/lib/commonKnowledge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -56,6 +57,28 @@ export function QuestionBuilder({
     ]);
   };
 
+  const addPreset = (presetId: string) => {
+    const preset = COMMON_KNOWLEDGE_PRESETS.find((p) => p.id === presetId);
+    if (!preset) return;
+    onChange([
+      ...questions,
+      {
+        ...newQuestion({
+          type: preset.type as QuestionType,
+          label: preset.label,
+          required: Boolean(preset.required),
+          options: preset.options ? [...preset.options] : [],
+          allow_other: Boolean(preset.allow_other),
+          other_label: preset.other_label || 'Other',
+          min: preset.min,
+          max: preset.max,
+          pattern: preset.pattern,
+        }),
+        __new: true,
+      },
+    ]);
+  };
+
   return (
     <div className="space-y-4">
       {locked ? (
@@ -65,9 +88,32 @@ export function QuestionBuilder({
         </p>
       ) : null}
 
+      <div className="border border-border bg-card p-3">
+        <Label className="font-display text-xs uppercase tracking-wide">Common knowledge</Label>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Predefined answers for gender, phone (country code), region, education, and more. Agents get
+          dropdowns; respondents can still pick Other and type a custom answer.
+        </p>
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          {COMMON_KNOWLEDGE_PRESETS.map((p) => (
+            <Button
+              key={p.id}
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-8 rounded-sm text-xs"
+              onClick={() => addPreset(p.id)}
+              title={p.description}
+            >
+              + {p.name}
+            </Button>
+          ))}
+        </div>
+      </div>
+
       {questions.length === 0 ? (
         <p className="border border-dashed border-border bg-card px-4 py-10 text-center text-sm text-muted-foreground">
-          No questions yet — add one to get started.
+          No questions yet — add a common-knowledge field above, or a blank question below.
         </p>
       ) : (
         <ol className="space-y-3">
@@ -154,6 +200,11 @@ export function QuestionBuilder({
                           (!q.options || q.options.length === 0)
                         ) {
                           patch.options = ['Option 1', 'Option 2'];
+                          patch.allow_other = true;
+                          patch.other_label = 'Other';
+                        }
+                        if (type === 'phone' || type === 'area') {
+                          patch.options = [];
                         }
                         update(q.id, patch);
                       }}
@@ -182,6 +233,19 @@ export function QuestionBuilder({
                     </Label>
                   </div>
                 </div>
+
+                {q.type === 'phone' ? (
+                  <p className="mt-3 text-xs text-muted-foreground">
+                    Agents see a country code dropdown (Kenya +254 default) plus the local number.
+                    Unknown countries use Other + custom dial code.
+                  </p>
+                ) : null}
+                {q.type === 'area' ? (
+                  <p className="mt-3 text-xs text-muted-foreground">
+                    Agents pick County → Sub-county → Ward → Village from the location list, or choose
+                    Other and type a custom place name.
+                  </p>
+                ) : null}
 
                 {isChoice && q.type !== 'yes_no' ? (
                   <div className="mt-3 space-y-2">
@@ -267,8 +331,7 @@ export function QuestionBuilder({
                         {q.allow_other ? (
                           <p className="text-xs text-muted-foreground">
                             Respondents can pick this if none of the listed options fit, then type
-                            their answer. You do not need to add &quot;Other&quot; to the list
-                            above.
+                            their answer.
                           </p>
                         ) : null}
                       </>
@@ -323,7 +386,7 @@ export function QuestionBuilder({
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="none">None</SelectItem>
-                        <SelectItem value="phone">Phone number</SelectItem>
+                        <SelectItem value="phone">Phone number (prefer Phone type)</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -383,7 +446,7 @@ export function QuestionBuilder({
 
       <Button type="button" variant="outline" className="rounded-sm" onClick={add}>
         <Plus className="mr-1.5 h-4 w-4" />
-        Add question
+        Add blank question
       </Button>
     </div>
   );

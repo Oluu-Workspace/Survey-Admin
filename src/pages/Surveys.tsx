@@ -180,7 +180,7 @@ const Surveys = () => {
   }
 
   return (
-    <div className="mx-auto max-w-5xl space-y-5">
+    <div className="w-full space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-muted-foreground">Campaigns and their field data.</p>
         <Dialog open={createOpen} onOpenChange={setCreateOpen}>

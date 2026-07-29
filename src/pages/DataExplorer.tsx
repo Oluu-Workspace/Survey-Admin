@@ -148,7 +148,7 @@ const DataExplorer = () => {
   }
 
   return (
-    <div className="mx-auto max-w-4xl space-y-5">
+    <div className="w-full space-y-5">
       <div>
         <h2 className="font-display text-lg font-semibold">Data Explorer</h2>
         <p className="text-sm text-muted-foreground">

@@ -139,7 +139,7 @@ const Agents = () => {
   }
 
   return (
-    <div className="mx-auto flex max-w-6xl flex-col gap-5 lg:flex-row lg:items-start">
+    <div className="flex w-full flex-col gap-5 lg:flex-row lg:items-start">
       <div className={`min-w-0 flex-1 space-y-4 ${selected || creating ? 'lg:max-w-[58%]' : ''}`}>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <p className="text-sm text-muted-foreground">

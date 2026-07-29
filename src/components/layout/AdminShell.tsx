@@ -110,7 +110,7 @@ export function PageChrome({ children }: { children: React.ReactNode }) {
         <header className="flex h-12 items-center border-b border-border bg-card px-6">
           <h1 className="font-display text-sm font-semibold tracking-tight text-foreground">{title}</h1>
         </header>
-        <main className="flex-1 overflow-auto p-6 md:p-8">{children}</main>
+        <main className="flex-1 overflow-auto p-4 md:p-5 lg:p-6">{children}</main>
       </div>
     </div>
   );

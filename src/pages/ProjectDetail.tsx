@@ -42,7 +42,7 @@ const ProjectDetail = () => {
   const surveys = (project.surveys || []) as { id: string; title?: string; status?: string }[];
 
   return (
-    <div className="mx-auto max-w-6xl space-y-6">
+    <div className="w-full space-y-6">
       <div className="flex items-start justify-between gap-4">
         <div>
           <Link to="/dashboard/projects" className="text-xs text-muted-foreground hover:text-foreground">

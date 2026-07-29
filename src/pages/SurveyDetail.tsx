@@ -11,9 +11,12 @@ import { normalizeQuestions, type SurveyQuestion } from '@/lib/questions';
 import { SurveyQuestionAnalysis } from '@/components/SurveyQuestionAnalysis';
 import { analyticsBundle, exportResponsesCsv, openPrintableReport, type ResponseLike } from '@/lib/analytics';
 import { fetchAllSurveyResponses } from '@/lib/fetchAllResponses';
+import { buildFullResearchReportData } from '@/lib/buildResearchReport';
 import {
   buildConclusions,
   buildExecutiveSummary,
+  buildKeyFindings,
+  collectionPeriodFromResponses,
   generateQuestionInsight,
 } from '@/lib/researchInsights';
 import { Button } from '@/components/ui/button';
@@ -263,30 +266,39 @@ const SurveyDetail = () => {
     await refreshAnalytics();
   };
 
-  const buildReportBundle = async () => {
-    const rows =
-      responseTotal <= responses.length
-        ? responses
-        : await fetchAllSurveyResponses(surveyId);
-    return analyticsBundle(questions, rows, (id) => agentName(agentMap.get(id)));
-  };
-
   const runPdfReport = async () => {
     setExportBusy(true);
     try {
-      toast.message('Preparing research report…');
-      const reportBundle = await buildReportBundle();
-      const perQ = (surveyAnalytics?.per_question || reportBundle.perQuestion) as import(
-        '@/components/SurveyAnalyticsPanel'
-      ).QuestionAnalytics[];
+      toast.message('Syncing all responses and analytics…');
+      const {
+        bundle: reportBundle,
+        rows,
+        perQuestion: perQ,
+        api,
+        responseCount,
+        analyticsFromApi,
+      } = await buildFullResearchReportData(
+        surveyId,
+        questions,
+        (id) => agentName(agentMap.get(id)),
+        compareBy || undefined,
+      );
       const questionInsights: Record<string, string> = {};
       for (const q of perQ) {
         if (q?.id) questionInsights[q.id] = generateQuestionInsight(q);
       }
+      const uniqueWards = Object.keys(reportBundle.byWard).filter(
+        (w) => w && w !== 'Unknown ward',
+      ).length;
+      const uniqueAgents = reportBundle.byAgent.filter((a) => a.count > 0).length;
       const result = openPrintableReport({
         surveyTitle: survey.title || 'Survey',
-        area: [survey.ward, survey.village].filter(Boolean).join(' · ') || 'All areas',
-        generatedAt: new Date().toLocaleString(),
+        surveySubtitle: survey.description || undefined,
+        area: [survey.ward, survey.village, survey.county].filter(Boolean).join(' · ') || 'All areas',
+        generatedAt: new Date().toLocaleString(undefined, {
+          dateStyle: 'medium',
+          timeStyle: 'short',
+        }),
         bundle: reportBundle,
         executiveSummary: buildExecutiveSummary({
           surveyTitle: survey.title || 'Survey',
@@ -294,14 +306,26 @@ const SurveyDetail = () => {
           excluded: reportBundle.totalExcluded,
           completionPct: reportBundle.completionRate,
           perQuestion: perQ,
+          collectionPeriod: collectionPeriodFromResponses(rows),
+          uniqueWards,
+          uniqueAgents,
         }),
         conclusions: buildConclusions(perQ),
         questionInsights,
+        keyFindings: buildKeyFindings(perQ),
+        trend: api?.trend,
+        statusBreakdown: api?.by_status,
+        comparisons: api?.comparisons,
+        totalResponsesFetched: responseCount,
+        analyticsFromApi,
       });
+      if (!analyticsFromApi) {
+        toast.message('Analytics API unavailable — report uses client-side calculations.');
+      }
       if (result.mode === 'download') {
         toast.success(`Popups blocked — downloaded ${result.filename}. Open it and use Print → Save as PDF.`);
       } else {
-        toast.success('Report opened — use Print → Save as PDF if the dialog did not appear.');
+        toast.success('Report opened — click Print / Save as PDF in the report window.');
       }
     } catch (err: unknown) {
       const msg =
@@ -341,7 +365,7 @@ const SurveyDetail = () => {
 
   if (!survey) {
     return (
-      <div className="mx-auto max-w-5xl space-y-4">
+      <div className="w-full space-y-4">
         <Button
           variant="ghost"
           size="sm"
@@ -358,7 +382,7 @@ const SurveyDetail = () => {
   }
 
   return (
-    <div className="mx-auto max-w-6xl space-y-6">
+    <div className="w-full space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-4 border-b border-border pb-5">
         <div>
           <Button variant="ghost" size="sm" className="-ml-2 mb-2 h-8 rounded-sm px-2" asChild>
@@ -681,8 +705,9 @@ const SurveyDetail = () => {
           <div className="space-y-4 border border-border bg-card p-6">
             <h2 className="font-display text-lg font-semibold">Research report &amp; export</h2>
             <p className="max-w-2xl text-sm text-muted-foreground">
-              Generate a publication-style PDF with executive summary, charts per question, interpretations,
-              and conclusions — or download the full anonymised dataset as CSV for statistical software.
+              Generate a publication-style report with executive summary, key findings, count vs percentage
+              graphs per question, ranked tables, geographic breakdowns, and conclusions — or download the
+              full anonymised dataset as CSV for statistical software.
             </p>
             <p className="text-sm">
               <span className="ledger-count">{responseTotal.toLocaleString()}</span> responses in this survey.

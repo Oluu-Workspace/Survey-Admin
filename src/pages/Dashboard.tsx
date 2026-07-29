@@ -87,7 +87,7 @@ const Dashboard = () => {
   const behindCounties = ops.county_progress.filter((c) => c.behind_target && c.target > 0);
 
   return (
-    <div className="mx-auto max-w-6xl space-y-8">
+    <div className="w-full space-y-8">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h2 className="font-display text-lg font-semibold tracking-tight">Research dashboard</h2>

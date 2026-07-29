@@ -13,6 +13,7 @@ export const QUESTION_TYPES = [
   'photo',
   'phone',
   'email',
+  'area',
 ] as const;
 
 export type QuestionType = (typeof QUESTION_TYPES)[number];
@@ -30,8 +31,9 @@ export const QUESTION_TYPE_LABELS: Record<QuestionType, string> = {
   likert: 'Likert scale',
   gps: 'GPS',
   photo: 'Photo',
-  phone: 'Phone',
+  phone: 'Phone (country code)',
   email: 'Email',
+  area: 'Region (County → Village)',
 };
 
 const ALIASES: Record<string, QuestionType> = {
@@ -41,8 +43,7 @@ const ALIASES: Record<string, QuestionType> = {
   radio: 'single_choice',
   dropdown: 'single_choice',
   checkbox: 'multiple_choice',
-  area: 'gps',
-  location: 'gps',
+  location: 'area',
 };
 
 export function normalizeQuestionType(raw: unknown): QuestionType {
