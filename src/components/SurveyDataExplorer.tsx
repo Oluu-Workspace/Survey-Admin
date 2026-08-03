@@ -12,6 +12,7 @@ import {
   Search,
 } from 'lucide-react';
 import { responsesAPI, surveysAPI } from '@/services/api';
+import type { ResponseFacets } from '@/components/AnalyticsFilterBar';
 import type { SurveyResponse } from '@/domain';
 import { LIFECYCLE_LABELS, LIFECYCLE_STAGES } from '@/domain/enums';
 import { exportResponsesCsv } from '@/domain/response';
@@ -118,6 +119,7 @@ export type SurveyDataExplorerProps = {
   surveyId: string;
   surveyTitle?: string;
   questions?: SurveyQuestion[];
+  facets?: ResponseFacets | null;
   agentFilter?: string;
   agentOptions?: { id: string; name: string }[];
   onAgentFilterChange?: (agentId: string) => void;
@@ -130,6 +132,7 @@ export function SurveyDataExplorer({
   surveyId,
   surveyTitle,
   questions: questionsProp,
+  facets: facetsProp,
   agentFilter = '',
   agentOptions = [],
   onAgentFilterChange,
@@ -145,6 +148,10 @@ export function SurveyDataExplorer({
   const [lifecycle, setLifecycle] = useState('all');
   const [status, setStatus] = useState('all');
   const [county, setCounty] = useState('');
+  const [ward, setWard] = useState('');
+  const [answerQuestionId, setAnswerQuestionId] = useState('');
+  const [answerValue, setAnswerValue] = useState('');
+  const [facets, setFacets] = useState<ResponseFacets | null>(facetsProp ?? null);
   const [sortBy, setSortBy] = useState('submitted_at');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [groupBy, setGroupBy] = useState<string>('none');
@@ -169,6 +176,15 @@ export function SurveyDataExplorer({
   }, [surveyId, questionsProp]);
 
   useEffect(() => {
+    if (facetsProp) setFacets(facetsProp);
+  }, [facetsProp]);
+
+  useEffect(() => {
+    if (facetsProp || !surveyId) return;
+    void surveysAPI.getResponseFacets(surveyId).then(setFacets).catch(() => setFacets(null));
+  }, [surveyId, facetsProp]);
+
+  useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(search.trim()), 350);
     return () => clearTimeout(t);
   }, [search]);
@@ -186,6 +202,9 @@ export function SurveyDataExplorer({
         survey_id: surveyId,
         agent_id: agentFilter || undefined,
         county: county || undefined,
+        ward: ward || undefined,
+        answer_question_id: answerQuestionId || undefined,
+        answer_value: answerValue || undefined,
         sort_by: sortBy,
         sort_order: sortOrder,
       });
@@ -206,6 +225,9 @@ export function SurveyDataExplorer({
     status,
     agentFilter,
     county,
+    ward,
+    answerQuestionId,
+    answerValue,
     sortBy,
     sortOrder,
   ]);
@@ -216,7 +238,7 @@ export function SurveyDataExplorer({
 
   useEffect(() => {
     setPagination((p) => ({ ...p, page: 1 }));
-  }, [debouncedSearch, lifecycle, status, agentFilter, county, sortBy, sortOrder, surveyId]);
+  }, [debouncedSearch, lifecycle, status, agentFilter, county, ward, answerQuestionId, answerValue, sortBy, sortOrder, surveyId]);
 
   const selected = rows.find((r) => r.id === selectedId) ?? null;
 
@@ -224,10 +246,16 @@ export function SurveyDataExplorer({
     if (selected) setNotes(selected.validation_notes || '');
   }, [selected?.id]);
 
-  const counties = useMemo(() => {
-    const set = new Set(rows.map((r) => r.location.county).filter(Boolean));
-    return Array.from(set).sort();
-  }, [rows]);
+  const counties = useMemo(() => facets?.counties || [], [facets]);
+  const wards = useMemo(() => facets?.wards || [], [facets]);
+  const answerQuestion = facets?.filterable_questions.find((q) => q.id === answerQuestionId);
+
+  const SORTABLE_COLUMNS: Partial<Record<ColumnKey, string>> = {
+    submitted: 'submitted_at',
+    quality: 'quality_score',
+    lifecycle: 'lifecycle_stage',
+    status: 'status',
+  };
 
   const grouped = useMemo(() => {
     if (groupBy === 'none') return [{ key: 'All', items: rows }];
@@ -445,7 +473,7 @@ export function SurveyDataExplorer({
             <SelectItem value="rejected">Rejected</SelectItem>
           </SelectContent>
         </Select>
-        <Select value={county || 'all'} onValueChange={(v) => setCounty(v === 'all' ? '' : v)}>
+        <Select value={county || 'all'} onValueChange={(v) => { setCounty(v === 'all' ? '' : v); setWard(''); }}>
           <SelectTrigger className="h-9 w-[130px] rounded-sm">
             <SelectValue placeholder="County" />
           </SelectTrigger>
@@ -458,6 +486,53 @@ export function SurveyDataExplorer({
             ))}
           </SelectContent>
         </Select>
+        <Select value={ward || 'all'} onValueChange={(v) => setWard(v === 'all' ? '' : v)}>
+          <SelectTrigger className="h-9 w-[120px] rounded-sm">
+            <SelectValue placeholder="Ward" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All wards</SelectItem>
+            {wards.map((w) => (
+              <SelectItem key={w} value={w}>
+                {w}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select
+          value={answerQuestionId || 'none'}
+          onValueChange={(v) => {
+            setAnswerQuestionId(v === 'none' ? '' : v);
+            setAnswerValue('');
+          }}
+        >
+          <SelectTrigger className="h-9 w-[160px] rounded-sm">
+            <SelectValue placeholder="Answer filter" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="none">Any answer</SelectItem>
+            {(facets?.filterable_questions || []).map((q) => (
+              <SelectItem key={q.id} value={q.id}>
+                {q.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        {answerQuestion ? (
+          <Select value={answerValue || 'all'} onValueChange={(v) => setAnswerValue(v === 'all' ? '' : v)}>
+            <SelectTrigger className="h-9 w-[130px] rounded-sm">
+              <SelectValue placeholder="Value" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Any value</SelectItem>
+              {answerQuestion.options.map((opt) => (
+                <SelectItem key={opt} value={opt}>
+                  {opt}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        ) : null}
         <Select value={groupBy} onValueChange={setGroupBy}>
           <SelectTrigger className="h-9 w-[120px] rounded-sm">
             <Group className="mr-1 h-3.5 w-3.5" />
@@ -576,28 +651,27 @@ export function SurveyDataExplorer({
                           <th className="w-10">
                             <span className="sr-only">Select</span>
                           </th>
-                          {ALL_COLUMNS.filter((c) => visibleColumns.includes(c.key)).map((c) => (
+                          {ALL_COLUMNS.filter((c) => visibleColumns.includes(c.key)).map((c) => {
+                            const sortField = SORTABLE_COLUMNS[c.key];
+                            const isSorted = sortField && sortBy === sortField;
+                            return (
                             <th
                               key={c.key}
-                              className="cursor-pointer whitespace-nowrap text-xs"
+                              className={`whitespace-nowrap text-xs ${sortField ? 'cursor-pointer' : ''}`}
                               onClick={() => {
-                                const map: Partial<Record<ColumnKey, string>> = {
-                                  submitted: 'submitted_at',
-                                  quality: 'quality_score',
-                                  lifecycle: 'lifecycle_stage',
-                                };
-                                const field = map[c.key] || c.key;
-                                if (sortBy === field) {
+                                if (!sortField) return;
+                                if (sortBy === sortField) {
                                   setSortOrder((o) => (o === 'asc' ? 'desc' : 'asc'));
                                 } else {
-                                  setSortBy(field);
+                                  setSortBy(sortField);
                                   setSortOrder('desc');
                                 }
                               }}
                             >
                               {c.label}
+                              {isSorted ? (sortOrder === 'desc' ? ' ↓' : ' ↑') : ''}
                             </th>
-                          ))}
+                          );})}
                         </tr>
                       </thead>
                       <tbody>

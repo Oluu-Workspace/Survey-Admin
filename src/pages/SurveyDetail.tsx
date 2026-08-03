@@ -9,6 +9,12 @@ import { SurveyInsightsDashboard } from '@/components/SurveyInsightsDashboard';
 import { SurveyDataExplorer } from '@/components/SurveyDataExplorer';
 import { normalizeQuestions, type SurveyQuestion } from '@/lib/questions';
 import { SurveyQuestionAnalysis } from '@/components/SurveyQuestionAnalysis';
+import { SurveyAnalyticsPanel } from '@/components/SurveyAnalyticsPanel';
+import {
+  AnalyticsFilterBar,
+  type AnalyticsFilters,
+  type ResponseFacets,
+} from '@/components/AnalyticsFilterBar';
 import { analyticsBundle, exportResponsesCsv, openPrintableReport, type ResponseLike } from '@/lib/analytics';
 import { fetchAllSurveyResponses } from '@/lib/fetchAllResponses';
 import { buildFullResearchReportData } from '@/lib/buildResearchReport';
@@ -85,6 +91,15 @@ const SurveyDetail = () => {
   const [compareBy, setCompareBy] = useState('');
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
   const [exportBusy, setExportBusy] = useState(false);
+  const [responseFacets, setResponseFacets] = useState<ResponseFacets | null>(null);
+  const [analyticsFilters, setAnalyticsFilters] = useState<AnalyticsFilters>({
+    county: '',
+    ward: '',
+    status: '',
+    lifecycle: '',
+    answerQuestionId: '',
+    answerValue: '',
+  });
 
   const setTab = (next: string) => {
     const params = new URLSearchParams(searchParams);
@@ -124,6 +139,12 @@ const SurveyDetail = () => {
       const analyticsRes = await surveysAPI.getAnalytics(surveyId, {
         agent_id: analyticsAgentId || undefined,
         compare_by: compareBy || undefined,
+        county: analyticsFilters.county || undefined,
+        ward: analyticsFilters.ward || undefined,
+        status: analyticsFilters.status || undefined,
+        lifecycle_stage: analyticsFilters.lifecycle || undefined,
+        answer_question_id: analyticsFilters.answerQuestionId || undefined,
+        answer_value: analyticsFilters.answerValue || undefined,
       });
       setSurveyAnalytics(analyticsRes);
       if (!compareBy && analyticsRes?.compare_by) {
@@ -134,7 +155,7 @@ const SurveyDetail = () => {
     } finally {
       setAnalyticsLoading(false);
     }
-  }, [surveyId, analyticsAgentId, compareBy]);
+  }, [surveyId, analyticsAgentId, compareBy, analyticsFilters]);
 
   useEffect(() => {
     void load();
@@ -154,6 +175,11 @@ const SurveyDetail = () => {
   useEffect(() => {
     void refreshAnalytics();
   }, [refreshAnalytics]);
+
+  useEffect(() => {
+    if (!surveyId) return;
+    void surveysAPI.getResponseFacets(surveyId).then(setResponseFacets).catch(() => setResponseFacets(null));
+  }, [surveyId, responseTotal]);
 
   const agentMap = useMemo(() => {
     const map = new Map<string, Agent>();
@@ -282,10 +308,33 @@ const SurveyDetail = () => {
         questions,
         (id) => agentName(agentMap.get(id)),
         compareBy || undefined,
+        {
+          agent_id: analyticsAgentId || undefined,
+          county: analyticsFilters.county || undefined,
+          ward: analyticsFilters.ward || undefined,
+          status: analyticsFilters.status || undefined,
+          lifecycle_stage: analyticsFilters.lifecycle || undefined,
+          answer_question_id: analyticsFilters.answerQuestionId || undefined,
+          answer_value: analyticsFilters.answerValue || undefined,
+        },
       );
       const questionInsights: Record<string, string> = {};
       for (const q of perQ) {
         if (q?.id) questionInsights[q.id] = generateQuestionInsight(q);
+      }
+      const filterParts: string[] = [];
+      if (analyticsAgentId) {
+        filterParts.push(`Agent: ${agentName(agentMap.get(analyticsAgentId))}`);
+      }
+      if (analyticsFilters.county) filterParts.push(`County: ${analyticsFilters.county}`);
+      if (analyticsFilters.ward) filterParts.push(`Ward: ${analyticsFilters.ward}`);
+      if (analyticsFilters.status) filterParts.push(`Status: ${analyticsFilters.status}`);
+      if (analyticsFilters.lifecycle) filterParts.push(`Stage: ${analyticsFilters.lifecycle}`);
+      if (analyticsFilters.answerQuestionId && analyticsFilters.answerValue) {
+        const qLabel =
+          questions.find((q) => q.id === analyticsFilters.answerQuestionId)?.label ||
+          analyticsFilters.answerQuestionId;
+        filterParts.push(`${qLabel} = ${analyticsFilters.answerValue}`);
       }
       const uniqueWards = Object.keys(reportBundle.byWard).filter(
         (w) => w && w !== 'Unknown ward',
@@ -318,6 +367,7 @@ const SurveyDetail = () => {
         comparisons: api?.comparisons,
         totalResponsesFetched: responseCount,
         analyticsFromApi,
+        filterSummary: filterParts.length ? filterParts.join(' · ') : undefined,
       });
       if (!analyticsFromApi) {
         toast.message('Analytics API unavailable — report uses client-side calculations.');
@@ -634,6 +684,7 @@ const SurveyDetail = () => {
             surveyId={surveyId}
             surveyTitle={survey.title}
             questions={questions}
+            facets={responseFacets}
             agentFilter={agentFilter}
             agentOptions={fieldAgents.map((row) => ({
               id: row.id,
@@ -674,7 +725,7 @@ const SurveyDetail = () => {
           />
         </TabsContent>
 
-        <TabsContent value="analysis" className="mt-4">
+        <TabsContent value="analysis" className="mt-4 space-y-6">
           {responseTotal === 0 ? (
             <div className="border border-dashed border-border bg-card px-4 py-12 text-center">
               <p className="text-sm text-muted-foreground">
@@ -685,19 +736,42 @@ const SurveyDetail = () => {
               </Button>
             </div>
           ) : (
-            <SurveyQuestionAnalysis
-              api={surveyAnalytics}
-              bundle={bundle}
-              agents={fieldAgents.map((row) => ({
-                id: row.id,
-                name: agentName(row.agent),
-              }))}
-              selectedAgentId={analyticsAgentId}
-              compareBy={compareBy}
-              onAgentChange={setAnalyticsAgentId}
-              onCompareByChange={setCompareBy}
-              loadingAnalytics={analyticsLoading}
-            />
+            <>
+              <AnalyticsFilterBar
+                facets={responseFacets}
+                filters={analyticsFilters}
+                onChange={(next) => setAnalyticsFilters((prev) => ({ ...prev, ...next }))}
+                agents={fieldAgents.map((row) => ({
+                  id: row.id,
+                  name: agentName(row.agent),
+                }))}
+                selectedAgentId={analyticsAgentId}
+                onAgentChange={setAnalyticsAgentId}
+                compareBy={compareBy}
+                compareOptions={surveyAnalytics?.compare_options || []}
+                onCompareByChange={setCompareBy}
+                loading={analyticsLoading}
+              />
+              <SurveyAnalyticsPanel
+                api={surveyAnalytics}
+                bundle={bundle}
+                agents={fieldAgents.map((row) => ({
+                  id: row.id,
+                  name: agentName(row.agent),
+                }))}
+                selectedAgentId={analyticsAgentId}
+                compareBy={compareBy}
+                onAgentChange={setAnalyticsAgentId}
+                onCompareByChange={setCompareBy}
+                loadingAnalytics={analyticsLoading}
+                hideScopeFilters
+                onExportReport={() => void runPdfReport()}
+              />
+              <div>
+                <h2 className="mb-3 font-display text-sm font-semibold">Question deep dive</h2>
+                <SurveyQuestionAnalysis api={surveyAnalytics} bundle={bundle} />
+              </div>
+            </>
           )}
         </TabsContent>
 

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ChevronLeft, ChevronRight, Sparkles } from 'lucide-react';
+import { ArrowDown, ArrowUp, ChevronLeft, ChevronRight, Sparkles } from 'lucide-react';
 import type { QuestionAnalytics } from '@/components/SurveyAnalyticsPanel';
 import type { analyticsBundle } from '@/lib/analytics';
 import { generateQuestionInsight } from '@/lib/researchInsights';
@@ -8,17 +8,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import {
   Bar,
   BarChart,
   CartesianGrid,
   Cell,
+  Legend,
   Pie,
   PieChart,
   ResponsiveContainer,
@@ -29,32 +23,112 @@ import {
 
 const COLORS = ['#1B4D3E', '#3D6B5C', '#A67C52', '#2C4A6E', '#5A6B7D', '#8B3A2F'];
 
+type ChartView = 'pie' | 'donut' | 'bar' | 'table';
+type TableSort = 'count' | 'pct' | 'label';
+type TableOrder = 'asc' | 'desc';
+
 type Props = {
-  api?: Parameters<typeof SurveyAnalyticsPanel>[0]['api'];
+  api?: {
+    per_question?: QuestionAnalytics[];
+    compare_options?: { id: string; label: string }[];
+    comparisons?: unknown[];
+  } | null;
   bundle: ReturnType<typeof analyticsBundle>;
-  agents: { id: string; name: string }[];
-  selectedAgentId?: string;
-  compareBy?: string;
-  onAgentChange?: (id: string) => void;
-  onCompareByChange?: (id: string) => void;
-  loadingAnalytics?: boolean;
+  questionFilter?: string;
+  onQuestionFilterChange?: (value: string) => void;
 };
 
-function QuestionFocusChart({ q }: { q: QuestionAnalytics }) {
-  const data = [...(q.distribution || [])].sort((a, b) => b.count - a.count);
+function QuestionFocusChart({
+  q,
+  chartView,
+  tableSort,
+  tableOrder,
+  onTableSort,
+}: {
+  q: QuestionAnalytics;
+  chartView: ChartView;
+  tableSort: TableSort;
+  tableOrder: TableOrder;
+  onTableSort: (col: TableSort) => void;
+}) {
+  const data = useMemo(() => {
+    const rows = [...(q.distribution || [])];
+    if (tableSort === 'label') {
+      rows.sort((a, b) => a.option.localeCompare(b.option));
+    } else {
+      rows.sort((a, b) => a[tableSort] - b[tableSort]);
+    }
+    if (tableOrder === 'asc') rows.reverse();
+    return rows;
+  }, [q.distribution, tableSort, tableOrder]);
+
   if (!data.length) {
     return (
       <p className="py-16 text-center text-sm text-muted-foreground">No answers in this filter scope.</p>
     );
   }
 
-  const DualBars = () => (
-    <div className="grid gap-4 md:grid-cols-2">
-      <div>
-        <div className="mb-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-          Counts
+  const SortBtn = ({ col, label }: { col: TableSort; label: string }) => (
+    <button
+      type="button"
+      className="inline-flex items-center gap-0.5 hover:text-foreground"
+      onClick={() => onTableSort(col)}
+    >
+      {label}
+      {tableSort === col ? (
+        tableOrder === 'desc' ? (
+          <ArrowDown className="h-3 w-3" />
+        ) : (
+          <ArrowUp className="h-3 w-3" />
+        )
+      ) : null}
+    </button>
+  );
+
+  if (chartView === 'pie' || chartView === 'donut') {
+    return (
+      <div className="space-y-4">
+        <div className="h-72 w-full">
+          <ResponsiveContainer width="100%" height="100%">
+            <PieChart>
+              <Pie
+                data={data}
+                dataKey="count"
+                nameKey="option"
+                cx="50%"
+                cy="50%"
+                innerRadius={chartView === 'donut' ? 52 : 0}
+                outerRadius={88}
+                paddingAngle={1}
+                label={(e) => `${e.pct}%`}
+              >
+                {data.map((_, i) => (
+                  <Cell key={i} fill={COLORS[i % COLORS.length]} />
+                ))}
+              </Pie>
+              <Tooltip
+                formatter={(value: number, _name, item) => [
+                  `${Number(value).toLocaleString()} (${item.payload.pct}%)`,
+                  item.payload.option,
+                ]}
+              />
+              <Legend
+                verticalAlign="bottom"
+                height={48}
+                formatter={(value) => <span className="text-xs">{value}</span>}
+              />
+            </PieChart>
+          </ResponsiveContainer>
         </div>
-        <div className="h-64 w-full">
+        <DistributionTable data={data} SortBtn={SortBtn} />
+      </div>
+    );
+  }
+
+  if (chartView === 'bar') {
+    return (
+      <div className="space-y-4">
+        <div className="h-72 w-full">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={data} margin={{ left: 8, right: 8, bottom: 48, top: 12 }}>
               <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
@@ -73,107 +147,57 @@ function QuestionFocusChart({ q }: { q: QuestionAnalytics }) {
                   'Count',
                 ]}
               />
-              <Bar dataKey="count" name="Count" fill="#5B9BD5" radius={[2, 2, 0, 0]} />
+              <Bar dataKey="count" name="Count" radius={[2, 2, 0, 0]}>
+                {data.map((_, i) => (
+                  <Cell key={i} fill={COLORS[i % COLORS.length]} />
+                ))}
+              </Bar>
             </BarChart>
           </ResponsiveContainer>
         </div>
-      </div>
-      <div>
-        <div className="mb-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-          Percentages (%)
-        </div>
-        <div className="h-64 w-full">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={data} margin={{ left: 8, right: 8, bottom: 48, top: 12 }}>
-              <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-              <XAxis
-                dataKey="option"
-                tick={{ fontSize: 10 }}
-                interval={0}
-                angle={-25}
-                textAnchor="end"
-                height={60}
-              />
-              <YAxis unit="%" tick={{ fontSize: 10 }} domain={[0, 100]} />
-              <Tooltip
-                formatter={(value: number, _name, item) => [
-                  `${value}% (${Number(item.payload.count).toLocaleString()})`,
-                  'Share',
-                ]}
-              />
-              <Bar dataKey="pct" name="%" fill="hsl(var(--primary))" radius={[2, 2, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
-    </div>
-  );
-
-  if (q.kind === 'number') {
-    return (
-      <div className="space-y-3">
-        <DualBars />
-        <p className="text-xs text-muted-foreground">
-          n={q.count}
-          {q.mean != null ? ` · mean ${q.mean}` : ''}
-          {q.median != null ? ` · median ${q.median}` : ''}
-        </p>
+        <DistributionTable data={data} SortBtn={SortBtn} />
       </div>
     );
   }
 
+  return <DistributionTable data={data} SortBtn={SortBtn} />;
+}
+
+function DistributionTable({
+  data,
+  SortBtn,
+}: {
+  data: { option: string; count: number; pct: number }[];
+  SortBtn: React.ComponentType<{ col: TableSort; label: string }>;
+}) {
   return (
-    <div className="space-y-4">
-      <DualBars />
-      {data.length <= 6 ? (
-        <div className="h-56 w-full">
-          <ResponsiveContainer width="100%" height="100%">
-            <PieChart>
-              <Pie
-                data={data}
-                dataKey="count"
-                nameKey="option"
-                cx="50%"
-                cy="50%"
-                outerRadius={80}
-                label={(e) => `${e.pct}%`}
-              >
-                {data.map((_, i) => (
-                  <Cell key={i} fill={COLORS[i % COLORS.length]} />
-                ))}
-              </Pie>
-              <Tooltip
-                formatter={(value: number, name, item) => [
-                  `${Number(value).toLocaleString()} (${item.payload.pct}%)`,
-                  String(name),
-                ]}
-              />
-            </PieChart>
-          </ResponsiveContainer>
-        </div>
-      ) : null}
-      <div className="overflow-auto">
-        <table className="w-full text-left text-xs">
-          <thead>
-            <tr className="border-b border-border text-muted-foreground">
-              <th className="py-2 pr-2">#</th>
-              <th className="py-2 pr-2">Label</th>
-              <th className="py-2 pr-2 text-right">Count</th>
-              <th className="py-2 text-right">%</th>
+    <div className="overflow-auto">
+      <table className="w-full text-left text-xs">
+        <thead>
+          <tr className="border-b border-border text-muted-foreground">
+            <th className="py-2 pr-2">#</th>
+            <th className="py-2 pr-2">
+              <SortBtn col="label" label="Label" />
+            </th>
+            <th className="py-2 pr-2 text-right">
+              <SortBtn col="count" label="Count" />
+            </th>
+            <th className="py-2 text-right">
+              <SortBtn col="pct" label="%" />
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {data.map((row, i) => (
+            <tr key={row.option} className="border-b border-border/60">
+              <td className="py-1.5 pr-2 tabular-nums text-muted-foreground">{i + 1}</td>
+              <td className="py-1.5 pr-2 font-medium">{row.option}</td>
+              <td className="py-1.5 pr-2 text-right tabular-nums">{row.count.toLocaleString()}</td>
+              <td className="py-1.5 text-right tabular-nums">{row.pct}%</td>
             </tr>
-          </thead>
-          <tbody>
-            {data.map((row, i) => (
-              <tr key={row.option} className="border-b border-border/60">
-                <td className="py-1.5 pr-2 tabular-nums text-muted-foreground">{i + 1}</td>
-                <td className="py-1.5 pr-2 font-medium">{row.option}</td>
-                <td className="py-1.5 pr-2 text-right tabular-nums">{row.count.toLocaleString()}</td>
-                <td className="py-1.5 text-right tabular-nums">{row.pct}%</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }
@@ -181,12 +205,8 @@ function QuestionFocusChart({ q }: { q: QuestionAnalytics }) {
 export function SurveyQuestionAnalysis({
   api,
   bundle,
-  agents,
-  selectedAgentId,
-  compareBy,
-  onAgentChange,
-  onCompareByChange,
-  loadingAnalytics,
+  questionFilter: externalFilter,
+  onQuestionFilterChange,
 }: Props) {
   const perQuestion = useMemo(() => {
     const rows = api?.per_question?.length
@@ -195,8 +215,14 @@ export function SurveyQuestionAnalysis({
     return rows.filter(isChartableAnalyticsRow);
   }, [api, bundle]);
 
-  const [filter, setFilter] = useState('');
+  const [internalFilter, setInternalFilter] = useState('');
+  const filter = externalFilter ?? internalFilter;
+  const setFilter = onQuestionFilterChange ?? setInternalFilter;
+
   const [index, setIndex] = useState(0);
+  const [chartView, setChartView] = useState<ChartView>('pie');
+  const [tableSort, setTableSort] = useState<TableSort>('count');
+  const [tableOrder, setTableOrder] = useState<TableOrder>('desc');
 
   const filtered = useMemo(() => {
     const q = filter.toLowerCase().trim();
@@ -206,58 +232,41 @@ export function SurveyQuestionAnalysis({
 
   useEffect(() => {
     setIndex(0);
-  }, [filter, selectedAgentId, compareBy]);
+  }, [filter]);
 
   const safeIndex = Math.min(index, Math.max(0, filtered.length - 1));
   const current = filtered[safeIndex];
-
   const insight = current ? generateQuestionInsight(current) : '';
 
-  const compareOptions = api?.compare_options || [];
+  const handleTableSort = (col: TableSort) => {
+    if (tableSort === col) {
+      setTableOrder((o) => (o === 'desc' ? 'asc' : 'desc'));
+    } else {
+      setTableSort(col);
+      setTableOrder(col === 'label' ? 'asc' : 'desc');
+    }
+  };
+
+  useEffect(() => {
+    if (!current) return;
+    const suggested =
+      current.chart === 'bar' ? 'bar' : current.chart === 'donut' ? 'donut' : 'pie';
+    setChartView(suggested);
+  }, [current?.id]);
+
+  if (!filtered.length) {
+    return (
+      <p className="border border-dashed border-border bg-card px-4 py-10 text-center text-sm text-muted-foreground">
+        No chartable questions match these filters.
+      </p>
+    );
+  }
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-end gap-3 border border-border bg-card p-3">
-        <div className="space-y-1">
-          <Label className="font-display text-xs uppercase tracking-wide">Agent filter</Label>
-          <Select
-            value={selectedAgentId || 'all'}
-            onValueChange={(v) => onAgentChange?.(v === 'all' ? '' : v)}
-          >
-            <SelectTrigger className="h-9 w-[200px] rounded-sm">
-              <SelectValue placeholder="All agents" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All agents combined</SelectItem>
-              {agents.map((a) => (
-                <SelectItem key={a.id} value={a.id}>
-                  {a.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="space-y-1">
-          <Label className="font-display text-xs uppercase tracking-wide">Compare by (demographics)</Label>
-          <Select
-            value={compareBy || compareOptions[0]?.id || ''}
-            onValueChange={(v) => onCompareByChange?.(v)}
-            disabled={!compareOptions.length}
-          >
-            <SelectTrigger className="h-9 w-[220px] rounded-sm">
-              <SelectValue placeholder="Compare by question" />
-            </SelectTrigger>
-            <SelectContent>
-              {compareOptions.map((q) => (
-                <SelectItem key={q.id} value={q.id}>
-                  {q.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-end gap-3">
         <div className="relative min-w-[180px] flex-1 space-y-1">
-          <Label className="font-display text-xs uppercase tracking-wide">Questions</Label>
+          <Label className="font-display text-xs uppercase tracking-wide">Search questions</Label>
           <Input
             className="h-9 rounded-sm"
             placeholder="Search questions…"
@@ -265,12 +274,26 @@ export function SurveyQuestionAnalysis({
             onChange={(e) => setFilter(e.target.value)}
           />
         </div>
-        {loadingAnalytics ? (
-          <span className="pb-2 text-xs text-muted-foreground">Refreshing analytics…</span>
-        ) : null}
+        <div className="space-y-1">
+          <Label className="font-display text-xs uppercase tracking-wide">Chart type</Label>
+          <div className="flex gap-1">
+            {(['pie', 'donut', 'bar', 'table'] as const).map((v) => (
+              <Button
+                key={v}
+                type="button"
+                size="sm"
+                variant={chartView === v ? 'default' : 'outline'}
+                className="h-9 rounded-sm capitalize"
+                onClick={() => setChartView(v)}
+              >
+                {v}
+              </Button>
+            ))}
+          </div>
+        </div>
       </div>
 
-      {filtered.length > 0 && current ? (
+      {current ? (
         <div className="grid gap-4 lg:grid-cols-[240px_1fr]">
           <aside className="max-h-[28rem] overflow-y-auto border border-border bg-card">
             {filtered.map((q, i) => (
@@ -318,7 +341,13 @@ export function SurveyQuestionAnalysis({
               </div>
             </div>
             <div className="p-4">
-              <QuestionFocusChart q={current} />
+              <QuestionFocusChart
+                q={current}
+                chartView={chartView}
+                tableSort={tableSort}
+                tableOrder={tableOrder}
+                onTableSort={handleTableSort}
+              />
               <div className="mt-4 flex gap-2 border border-border bg-muted/30 p-3 text-sm">
                 <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
                 <div>

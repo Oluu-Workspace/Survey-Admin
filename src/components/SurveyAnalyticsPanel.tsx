@@ -114,6 +114,7 @@ type Props = {
   onCompareByChange?: (questionId: string) => void;
   loadingAnalytics?: boolean;
   onExportReport?: () => void;
+  hideScopeFilters?: boolean;
 };
 
 function ChartCard({
@@ -486,6 +487,7 @@ export function SurveyAnalyticsPanel({
   onCompareByChange,
   loadingAnalytics,
   onExportReport,
+  hideScopeFilters = false,
 }: Props) {
   const [activeCompareId, setActiveCompareId] = useState<string>('');
 
@@ -586,49 +588,55 @@ export function SurveyAnalyticsPanel({
         ) : null}
       </div>
 
+      {(hideScopeFilters && !loadingAnalytics) ? null : (
       <div className="flex flex-wrap gap-3 border border-border bg-card p-3">
-        <div className="space-y-1">
-          <Label className="font-display text-xs uppercase tracking-wide">Scope</Label>
-          <Select
-            value={selectedAgentId || 'all'}
-            onValueChange={(v) => onAgentChange?.(v === 'all' ? '' : v)}
-          >
-            <SelectTrigger className="h-9 w-[220px] rounded-sm">
-              <SelectValue placeholder="All agents combined" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All agents combined</SelectItem>
-              {agents.map((a) => (
-                <SelectItem key={a.id} value={a.id}>
-                  {a.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="space-y-1">
-          <Label className="font-display text-xs uppercase tracking-wide">Compare by</Label>
-          <Select
-            value={compareBy || view.compareOptions[0]?.id || ''}
-            onValueChange={(v) => onCompareByChange?.(v)}
-            disabled={!view.compareOptions.length}
-          >
-            <SelectTrigger className="h-9 w-[220px] rounded-sm">
-              <SelectValue placeholder="Pick a question" />
-            </SelectTrigger>
-            <SelectContent>
-              {view.compareOptions.map((q) => (
-                <SelectItem key={q.id} value={q.id}>
-                  {q.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+        {!hideScopeFilters ? (
+          <>
+            <div className="space-y-1">
+              <Label className="font-display text-xs uppercase tracking-wide">Scope</Label>
+              <Select
+                value={selectedAgentId || 'all'}
+                onValueChange={(v) => onAgentChange?.(v === 'all' ? '' : v)}
+              >
+                <SelectTrigger className="h-9 w-[220px] rounded-sm">
+                  <SelectValue placeholder="All agents combined" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All agents combined</SelectItem>
+                  {agents.map((a) => (
+                    <SelectItem key={a.id} value={a.id}>
+                      {a.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label className="font-display text-xs uppercase tracking-wide">Compare by</Label>
+              <Select
+                value={compareBy || view.compareOptions[0]?.id || ''}
+                onValueChange={(v) => onCompareByChange?.(v)}
+                disabled={!view.compareOptions.length}
+              >
+                <SelectTrigger className="h-9 w-[220px] rounded-sm">
+                  <SelectValue placeholder="Pick a question" />
+                </SelectTrigger>
+                <SelectContent>
+                  {view.compareOptions.map((q) => (
+                    <SelectItem key={q.id} value={q.id}>
+                      {q.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </>
+        ) : null}
         {loadingAnalytics ? (
           <div className="flex items-end pb-2 text-xs text-muted-foreground">Updating…</div>
         ) : null}
       </div>
+      )}
 
       <div className="grid grid-cols-2 gap-px overflow-hidden border border-border bg-border sm:grid-cols-4">
         {metrics.map(([label, val]) => (

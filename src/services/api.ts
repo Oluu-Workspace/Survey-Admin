@@ -159,10 +159,30 @@ export const surveysAPI = {
 
   getAnalytics: async (
     id: string,
-    params?: { agent_id?: string; compare_by?: string },
+    params?: {
+      agent_id?: string;
+      compare_by?: string;
+      county?: string;
+      ward?: string;
+      status?: string;
+      lifecycle_stage?: string;
+      answer_question_id?: string;
+      answer_value?: string;
+    },
   ) => {
     const { data } = await api.get(`/surveys/${id}/analytics`, { params });
     return data;
+  },
+
+  getResponseFacets: async (id: string) => {
+    const { data } = await api.get(`/surveys/${id}/responses/facets`);
+    return data as {
+      counties: string[];
+      wards: string[];
+      statuses: string[];
+      lifecycle_stages: string[];
+      filterable_questions: Array<{ id: string; label: string; options: string[] }>;
+    };
   },
   
   getInsights: async (id: string, params?: { agent_id?: string }) => {
@@ -191,6 +211,8 @@ export const responsesAPI = {
     q?: string;
     sort_by?: string;
     sort_order?: 'asc' | 'desc';
+    answer_question_id?: string;
+    answer_value?: string;
   }) => {
     const { data } = await api.get('/responses', {
       params: {

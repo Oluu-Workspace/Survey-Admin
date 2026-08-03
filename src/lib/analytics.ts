@@ -368,6 +368,7 @@ export function openPrintableReport(opts: {
   }>;
   totalResponsesFetched?: number;
   analyticsFromApi?: boolean;
+  filterSummary?: string;
 }): OpenHtmlReportResult {
   const {
     surveyTitle,
@@ -380,12 +381,12 @@ export function openPrintableReport(opts: {
     questionInsights,
     keyFindings,
     trend,
-    statusBreakdown: _statusBreakdown,
+    statusBreakdown,
     comparisons,
     totalResponsesFetched,
     analyticsFromApi: _analyticsFromApi,
+    filterSummary,
   } = opts;
-  void _statusBreakdown;
   void _analyticsFromApi;
   const chartQuestions = bundle.perQuestion.filter(isChartableAnalyticsRow);
   const reportBundle = { ...bundle, perQuestion: chartQuestions };
@@ -481,50 +482,118 @@ export function openPrintableReport(opts: {
       </tbody></table>`;
   };
 
+  const palette = ['#1B4D3E', '#3D6B5C', '#A67C52', '#2C4A6E', '#8B3A2F', '#5A6B7D', '#6B8F71', '#2C3E50'];
+
+  const topNWithOther = (
+    items: { option: string; count: number; pct: number }[],
+    n = 8,
+  ): { option: string; count: number; pct: number }[] => {
+    const sorted = [...items].sort((a, b) => b.count - a.count);
+    if (sorted.length <= n) return sorted;
+    const head = sorted.slice(0, n);
+    const rest = sorted.slice(n);
+    const otherCount = rest.reduce((s, i) => s + i.count, 0);
+    const total = sorted.reduce((s, i) => s + i.count, 0) || 1;
+    return [
+      ...head,
+      { option: 'Other', count: otherCount, pct: Math.round((otherCount / total) * 100) },
+    ];
+  };
+
+  const pieSvg = (
+    items: { option: string; count: number; pct: number }[],
+    size = 150,
+    innerRatio = 0,
+  ) => {
+    if (!items.length) return '<p class="meta">No data</p>';
+    const total = items.reduce((sum, item) => sum + item.count, 0) || 1;
+    const cx = size / 2;
+    const cy = size / 2;
+    const r = size / 2 - 6;
+    const ri = innerRatio > 0 ? r * innerRatio : 0;
+    let angle = -Math.PI / 2;
+    const slices = items.map((item, index) => {
+      const slice = (item.count / total) * Math.PI * 2;
+      const x1 = cx + r * Math.cos(angle);
+      const y1 = cy + r * Math.sin(angle);
+      const x2 = cx + r * Math.cos(angle + slice);
+      const y2 = cy + r * Math.sin(angle + slice);
+      const large = slice > Math.PI ? 1 : 0;
+      const fill = palette[index % palette.length];
+      let path: string;
+      if (ri > 0) {
+        const ix1 = cx + ri * Math.cos(angle);
+        const iy1 = cy + ri * Math.sin(angle);
+        const ix2 = cx + ri * Math.cos(angle + slice);
+        const iy2 = cy + ri * Math.sin(angle + slice);
+        path = `M ${x1} ${y1} A ${r} ${r} 0 ${large} 1 ${x2} ${y2} L ${ix2} ${iy2} A ${ri} ${ri} 0 ${large} 0 ${ix1} ${iy1} Z`;
+      } else {
+        path = `M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 ${large} 1 ${x2} ${y2} Z`;
+      }
+      angle += slice;
+      return `<path d="${path}" fill="${fill}" stroke="#fff" stroke-width="1"/>`;
+    });
+    const center =
+      innerRatio > 0
+        ? `<text x="${cx}" y="${cy - 2}" text-anchor="middle" font-size="14" font-weight="600" fill="#1A2838">${total}</text>
+           <text x="${cx}" y="${cy + 10}" text-anchor="middle" font-size="8" fill="#5A6B7D">answers</text>`
+        : '';
+    return `<svg class="pie-svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" role="img">${slices.join('')}${center}</svg>`;
+  };
+
+  const chartLegend = (items: { option: string; count: number; pct: number }[]) =>
+    items
+      .map(
+        (item, index) =>
+          `<div class="legend-row"><span class="swatch" style="background:${palette[index % palette.length]}"></span><span>${escapeHtml(item.option)}</span><span class="mono">${item.count.toLocaleString()} (${item.pct}%)</span></div>`,
+      )
+      .join('');
+
+  const pieCard = (title: string, items: { option: string; count: number; pct: number }[], donut = false) => {
+    const data = topNWithOther(items);
+    if (!data.length) return `<section class="mini-chart"><h3>${escapeHtml(title)}</h3><p class="meta">No data</p></section>`;
+    return `<section class="mini-chart">
+      <h3>${escapeHtml(title)}</h3>
+      <div class="pie-card">
+        ${pieSvg(data, 140, donut ? 0.52 : 0)}
+        <div class="legend">${chartLegend(data)}</div>
+      </div>
+    </section>`;
+  };
+
   const choiceBlock = (
     distribution: { option: string; count: number; pct: number }[],
     foot = '',
     insightBlock = '',
   ) => {
     if (!distribution.length) return `<p class="meta">No distribution data.</p>${insightBlock}`;
+    const sorted = [...distribution].sort((a, b) => b.count - a.count);
+    const pieData = topNWithOther(sorted, 10);
     return `
-      <div class="meta" style="margin-bottom:8px">Compare absolute counts with percentage share — both matter for interpretation.</div>
-      <div class="two-charts">
-        <div class="chart-col">
-          <div class="chart-title">Graph — Counts</div>
-          ${columnChart(distribution, 'count')}
-          ${barsByCount(distribution)}
+      <div class="chart-row">
+        <div class="chart-panel">
+          <div class="chart-title">Pie chart — share (%)</div>
+          <div class="pie-card">${pieSvg(pieData, 160, 0)}<div class="legend">${chartLegend(pieData)}</div></div>
         </div>
-        <div class="chart-col">
-          <div class="chart-title">Graph — Percentages (%)</div>
-          ${columnChart(distribution, 'pct')}
-          ${barsByPct(distribution)}
+        <div class="chart-panel">
+          <div class="chart-title">Donut chart — share (%)</div>
+          <div class="pie-card">${pieSvg(pieData, 160, 0.55)}<div class="legend">${chartLegend(pieData)}</div></div>
         </div>
       </div>
-      <div class="chart-title" style="margin-top:12px">Detailed breakdown</div>
-      ${distributionTable(distribution)}
+      <div class="chart-row">
+        <div class="chart-panel">
+          <div class="chart-title">Bar chart — counts</div>
+          ${columnChart(sorted, 'count')}
+        </div>
+        <div class="chart-panel">
+          <div class="chart-title">Bar chart — percentages (%)</div>
+          ${columnChart(sorted, 'pct')}
+        </div>
+      </div>
+      <div class="chart-title" style="margin-top:10px">Data table (sorted by count)</div>
+      ${distributionTable(sorted)}
       ${foot}
       ${insightBlock}`;
-  };
-
-  const palette = ['#1B4D3E', '#3D6B5C', '#A67C52', '#2C4A6E', '#8B3A2F', '#5A6B7D'];
-  const donut = (items: { option: string; count: number; pct: number }[]) => {
-    const answerTotal = items.reduce((sum, item) => sum + item.count, 0);
-    const total = answerTotal || 1;
-    let cursor = 0;
-    const segments = items.map((item, index) => {
-      const slice = (item.count / total) * 100;
-      const start = cursor;
-      cursor += slice;
-      return `${palette[index % palette.length]} ${start}% ${cursor}%`;
-    });
-    const legend = items
-      .map(
-        (item, index) =>
-          `<div class="legend-row"><span class="swatch" style="background:${palette[index % palette.length]}"></span><span>${escapeHtml(item.option)}</span><span class="mono">${item.count} (${item.pct}%)</span></div>`,
-      )
-      .join('');
-    return `<div class="donut-wrap"><div class="donut" style="background:conic-gradient(${segments.join(',')})"><div class="donut-hole"><strong class="mono">${answerTotal}</strong><span>answers</span></div></div><div class="legend">${legend}</div></div>`;
   };
 
   const rankedBars = (record: Record<string, number>) => {
@@ -565,10 +634,27 @@ export function openPrintableReport(opts: {
         </section>`;
       }
       if (q.kind === 'number') {
-        return `<section class="question">${header}<table class="stats"><thead><tr><th>Valid n</th><th>Min</th><th>Mean</th><th>Median</th><th>Max</th></tr></thead><tbody><tr><td class="mono">${q.count}</td><td class="mono">${q.min ?? '—'}</td><td class="mono">${q.mean ?? '—'}</td><td class="mono">${q.median ?? '—'}</td><td class="mono">${q.max ?? '—'}</td></tr></tbody></table>
-          <div class="chart-title" style="margin-top:10px">Distribution</div>
-          ${columnChart(q.distribution || [], 'count')}
-          ${bars(q.distribution || [])}${insightBlock}</section>`;
+        const dist = q.distribution || [];
+        return `<section class="question">${header}
+          <div class="meta">n=${q.count.toLocaleString()} · numeric / bands</div>
+          <table class="stats"><thead><tr><th>Valid n</th><th>Min</th><th>Mean</th><th>Median</th><th>Max</th></tr></thead><tbody><tr>
+            <td class="mono">${q.count}</td><td class="mono">${q.min ?? '—'}</td><td class="mono">${q.mean ?? '—'}</td>
+            <td class="mono">${q.median ?? '—'}</td><td class="mono">${q.max ?? '—'}</td>
+          </tr></tbody></table>
+          ${dist.length ? choiceBlock(dist, '', insightBlock) : insightBlock}
+        </section>`;
+      }
+      if (q.kind === 'media' && (q.distribution?.length || 0) > 0) {
+        return `<section class="question">${header}
+          <div class="meta">n=${q.count.toLocaleString()} · capture status</div>
+          ${choiceBlock(q.distribution || [], '', insightBlock)}
+        </section>`;
+      }
+      if ((q.distribution?.length || 0) > 0) {
+        return `<section class="question">${header}
+          <div class="meta">n=${q.count.toLocaleString()} · top responses</div>
+          ${choiceBlock(q.distribution || [], '', insightBlock)}
+        </section>`;
       }
       return '';
     })
@@ -614,10 +700,44 @@ export function openPrintableReport(opts: {
 
   const trendHtml =
     trend && trend.length
-      ? `<h2>Submissions over time</h2><table class="stats"><thead><tr><th>Date</th><th>Submissions</th></tr></thead><tbody>${trend
+      ? `<h2>Submissions over time</h2>
+        <div class="chart-panel" style="max-width:520px">
+          ${columnChart(
+            trend.map((t) => ({ option: t.date, count: t.count, pct: 0 })),
+            'count',
+          )}
+        </div>
+        <table class="stats"><thead><tr><th>Date</th><th>Submissions</th></tr></thead><tbody>${trend
           .map((t) => `<tr><td>${escapeHtml(t.date)}</td><td class="mono">${t.count}</td></tr>`)
           .join('')}</tbody></table>`
       : '';
+
+  const agentTotal = bundle.byAgent.reduce((s, a) => s + a.count, 0) || 1;
+
+  const wardDist = Object.entries(bundle.byWard)
+    .filter(([k]) => k && k !== 'Unknown ward')
+    .map(([option, count]) => {
+      const total = Object.values(bundle.byWard).reduce((s, c) => s + c, 0) || 1;
+      return { option, count, pct: Math.round((count / total) * 100) };
+    });
+  const villageDist = Object.entries(bundle.byVillage)
+    .filter(([k]) => k && k !== 'Unknown village')
+    .map(([option, count]) => {
+      const total = Object.values(bundle.byVillage).reduce((s, c) => s + c, 0) || 1;
+      return { option, count, pct: Math.round((count / total) * 100) };
+    });
+  const agentDist = bundle.byAgent
+    .filter((a) => a.count > 0)
+    .map((a) => ({
+      option: a.name,
+      count: a.count,
+      pct: Math.round((a.count / agentTotal) * 100),
+    }));
+  const statusDist = (statusBreakdown || []).map((s) => ({
+    option: s.option,
+    count: s.count,
+    pct: s.pct ?? 0,
+  }));
 
   const comparisonBlocks =
     comparisons && comparisons.length
@@ -664,6 +784,10 @@ export function openPrintableReport(opts: {
   type PageSpec = { title: string; body: string };
   const pages: PageSpec[] = [];
 
+  const filterNote = filterSummary
+    ? `<p class="note"><strong>Filters applied:</strong> ${escapeHtml(filterSummary)}. Charts reflect this subset only.</p>`
+    : '<p class="note">Clean dataset — names, phones, and free-text identity fields are excluded from charts.</p>';
+
   pages.push({
     title: 'Cover & summary',
     body: `
@@ -674,13 +798,12 @@ export function openPrintableReport(opts: {
         <div class="meta">${reportArea} · Generated ${reportDate}</div>
       </header>
       ${fetchedNote}
-      <p class="toc"><strong>Document pages</strong> — each sheet below is Page 1, Page 2, … with date/time and pagination in the footer.</p>
+      ${filterNote}
       <div class="grid grid-3">
         <div class="cell"><div class="label">Responses</div><div class="val">${bundle.totalIncluded.toLocaleString()}</div></div>
         <div class="cell"><div class="label">Chart questions</div><div class="val">${reportBundle.perQuestion.length}</div></div>
         <div class="cell"><div class="label">Completion</div><div class="val">${bundle.completionRate}%</div></div>
       </div>
-      <p class="note">Figures use valid field responses only. Read <strong>count</strong> and <strong>percentage</strong> together.</p>
       <h2>Executive summary</h2>
       <ul>${(executiveSummary || [])
         .map((b) => `<li>${escapeHtml(b)}</li>`)
@@ -688,21 +811,40 @@ export function openPrintableReport(opts: {
       ${keyFindingsHtml}
       <h2>How to read this report</h2>
       <ul>
-        <li>Percentages are the share of answers for each question.</li>
-        <li>Charts show both absolute counts and percentage share.</li>
-        <li>These are descriptive results for the collected sample.</li>
-      </ul>
+        <li>Each chartable question includes pie, donut, bar, and data table views.</li>
+        <li>Percentages are shares of answers for that question — read alongside counts.</li>
+        <li>Identity fields (names, phones) are never charted.</li>
+      </ul>`,
+  });
+
+  pages.push({
+    title: 'Overview charts',
+    body: `
+      <h2>Overview — geographic &amp; team distribution</h2>
+      <p class="meta">Pie and donut charts for where data was collected and who collected it.</p>
+      <div class="pie-grid">
+        ${pieCard('Submissions by ward', wardDist, false)}
+        ${pieCard('Submissions by ward (donut)', wardDist, true)}
+        ${pieCard('Submissions by village', villageDist, false)}
+        ${pieCard('Submissions by village (donut)', villageDist, true)}
+      </div>
+      <div class="pie-grid">
+        ${statusDist.length ? pieCard('Review status', statusDist, false) : ''}
+        ${statusDist.length ? pieCard('Review status (donut)', statusDist, true) : ''}
+        ${pieCard('Field agents', agentDist, false)}
+        ${pieCard('Field agents (donut)', agentDist, true)}
+      </div>
       ${trendHtml}`,
   });
 
-  const qChunks = chunk(questionBlocks, 2);
+  const qChunks = chunk(questionBlocks, 1);
   qChunks.forEach((parts, i) => {
     if (!parts.length) return;
     pages.push({
-      title: qChunks.length > 1 ? `Question analysis (${i + 1}/${qChunks.length})` : 'Question analysis',
+      title: qChunks.length > 1 ? `Question ${i + 1} of ${qChunks.length}` : 'Question analysis',
       body: `
-        <h2>Question analysis${qChunks.length > 1 ? ` — part ${i + 1} of ${qChunks.length}` : ''}</h2>
-        <p class="meta">Count graph · percentage graph · Label / Count / Percentage table.</p>
+        <h2>Question analysis${qChunks.length > 1 ? ` — ${i + 1} of ${qChunks.length}` : ''}</h2>
+        <p class="meta">Pie · donut · count bar · percentage bar · sorted data table.</p>
         ${parts.join('')}`,
     });
   });
@@ -719,18 +861,17 @@ export function openPrintableReport(opts: {
     });
   }
 
-  const agentTotal = bundle.byAgent.reduce((s, a) => s + a.count, 0) || 1;
   pages.push({
-    title: 'Conclusions & geography',
+    title: 'Conclusions & tables',
     body: `
       <h2>Conclusions &amp; recommendations</h2>
       <ul>${(conclusions || [])
         .map((b) => `<li>${escapeHtml(b)}</li>`)
         .join('') || '<li class="meta">See question-level interpretations above.</li>'}</ul>
-      <h2>Geographic distribution</h2>
+      <h2>Geographic tables</h2>
       <div class="two-col">
-        <section class="question"><h3>By ward</h3>${rankedTable(bundle.byWard, 'Ward')}${rankedBars(bundle.byWard)}</section>
-        <section class="question"><h3>By village</h3>${rankedTable(bundle.byVillage, 'Village')}${rankedBars(bundle.byVillage)}</section>
+        <section class="question"><h3>By ward</h3>${rankedTable(bundle.byWard, 'Ward')}</section>
+        <section class="question"><h3>By village</h3>${rankedTable(bundle.byVillage, 'Village')}</section>
       </div>
       <h2>Field team contribution</h2>
       <table class="stats"><thead><tr><th>Agent</th><th class="text-right">Interviews</th><th class="text-right">Share %</th></tr></thead><tbody>${
@@ -768,8 +909,6 @@ export function openPrintableReport(opts: {
     </article>`,
     )
     .join('');
-
-  void donut;
 
   const html = `<!DOCTYPE html><html><head><meta charset="utf-8"/><title>${reportTitle} — Report</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"/><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
@@ -856,7 +995,14 @@ export function openPrintableReport(opts: {
   .stats th { background: #EEF2F5; color: #5A6B7D; font-size: 9px; text-transform: uppercase; }
   .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; break-inside: avoid; }
   .two-charts { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; break-inside: avoid; }
+  .chart-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 10px 0; break-inside: avoid; }
+  .chart-panel { min-width: 0; border: 1px solid #E8EDF2; padding: 10px; background: #fafbfc; }
   .chart-col { min-width: 0; }
+  .pie-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 10px 0 14px; }
+  .mini-chart { border: 1px solid #D3DAE3; padding: 10px; break-inside: avoid; }
+  .mini-chart h3 { font-size: 11px; margin: 0 0 8px; }
+  .pie-card { display: flex; align-items: flex-start; gap: 12px; }
+  .pie-svg { flex: 0 0 auto; }
   .chart-title { font-size: 9px; text-transform: uppercase; letter-spacing: 0.06em; color: #5A6B7D; margin: 0 0 6px; }
   .text-right { text-align: right; }
   .total-row td { background: #EEF2F5; }

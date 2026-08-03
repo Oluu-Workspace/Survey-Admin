@@ -85,12 +85,28 @@ export async function buildFullResearchReportData(
   questions: SurveyQuestion[],
   agentName: (id: string) => string,
   compareBy?: string,
+  filters?: {
+    agent_id?: string;
+    county?: string;
+    ward?: string;
+    status?: string;
+    lifecycle_stage?: string;
+    answer_question_id?: string;
+    answer_value?: string;
+  },
 ) {
   const rowsPromise = fetchAllSurveyResponses(surveyId);
   let api: SurveyAnalyticsPayload | null = null;
   try {
     api = (await surveysAPI.getAnalytics(surveyId, {
       compare_by: compareBy || undefined,
+      agent_id: filters?.agent_id,
+      county: filters?.county,
+      ward: filters?.ward,
+      status: filters?.status,
+      lifecycle_stage: filters?.lifecycle_stage,
+      answer_question_id: filters?.answer_question_id,
+      answer_value: filters?.answer_value,
     })) as SurveyAnalyticsPayload;
   } catch {
     api = null;
