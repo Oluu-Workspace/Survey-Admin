@@ -6,7 +6,8 @@ export type Respondent = {
   name: string;
   phone_number: string;
   gender: string;
-  age: number | null;
+  /** Numeric age or age-band label (e.g. "18-24"). */
+  age: number | string | null;
   consent: boolean;
 };
 
@@ -66,12 +67,16 @@ export function mapResponseFromApi(raw: Record<string, unknown>): SurveyResponse
         respondentRaw.phone_number ?? respondentRaw.phoneNumber ?? '',
       ),
       gender: String(respondentRaw.gender ?? respondentRaw.sex ?? ''),
-      age:
-        typeof respondentRaw.age === 'number'
-          ? respondentRaw.age
-          : respondentRaw.age != null
-            ? Number(respondentRaw.age)
-            : null,
+      age: (() => {
+        const a = respondentRaw.age;
+        if (typeof a === 'number' && Number.isFinite(a)) return a;
+        if (typeof a === 'string' && a.trim()) {
+          const trimmed = a.trim();
+          if (/^\d+$/.test(trimmed)) return Number(trimmed);
+          return trimmed; // age band e.g. "18-24"
+        }
+        return null;
+      })(),
       consent: Boolean(respondentRaw.consent ?? true),
     },
     location: normalizeLocation(raw.location),

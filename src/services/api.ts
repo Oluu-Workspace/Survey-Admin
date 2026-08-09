@@ -104,6 +104,11 @@ export const agentsAPI = {
     const { data } = await api.put(`/agents/${id}`, agentData);
     return data;
   },
+
+  delete: async (id: string) => {
+    const { data } = await api.delete(`/agents/${id}`);
+    return data;
+  },
   
   activate: async (id: string) => {
     const { data } = await api.post(`/agents/${id}/activate`);
@@ -114,9 +119,30 @@ export const agentsAPI = {
     const { data } = await api.post(`/agents/${id}/deactivate`);
     return data;
   },
+
+  getSurveyAssignments: async (id: string) => {
+    const { data } = await api.get(`/agents/${id}/surveys`);
+    return data;
+  },
+
+  setSurveyAssignments: async (id: string, survey_ids: string[]) => {
+    const { data } = await api.put(`/agents/${id}/surveys`, { survey_ids });
+    return data;
+  },
   
   getStats: async () => {
     const { data } = await api.get('/agents/stats');
+    return data;
+  },
+};
+
+export const usersAPI = {
+  getAll: async (params?: { role?: string }) => {
+    const { data } = await api.get('/users', { params });
+    return data;
+  },
+  create: async (payload: Record<string, unknown>) => {
+    const { data } = await api.post('/users', payload);
     return data;
   },
 };

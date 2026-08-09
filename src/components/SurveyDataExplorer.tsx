@@ -44,7 +44,7 @@ import { Label } from '@/components/ui/label';
 
 const VIEWS_KEY = 'tafiti-survey-data-views';
 
-type ColumnKey =
+type MetaColumnKey =
   | 'id'
   | 'project'
   | 'respondent'
@@ -62,7 +62,10 @@ type ColumnKey =
   | 'lifecycle'
   | 'quality';
 
-const ALL_COLUMNS: { key: ColumnKey; label: string }[] = [
+/** Meta column or `q:<questionId>` for a survey question answer. */
+type ColumnKey = MetaColumnKey | `q:${string}`;
+
+const META_COLUMNS: { key: MetaColumnKey; label: string }[] = [
   { key: 'id', label: 'Response ID' },
   { key: 'project', label: 'Project' },
   { key: 'respondent', label: 'Respondent' },
@@ -80,6 +83,39 @@ const ALL_COLUMNS: { key: ColumnKey; label: string }[] = [
   { key: 'lifecycle', label: 'Stage' },
   { key: 'quality', label: 'Quality' },
 ];
+
+const DEFAULT_META_VISIBLE: MetaColumnKey[] = ['agent', 'submitted'];
+
+function questionColumnKey(questionId: string): ColumnKey {
+  return `q:${questionId}`;
+}
+
+function isQuestionColumn(key: ColumnKey): key is `q:${string}` {
+  return key.startsWith('q:');
+}
+
+function questionIdFromColumn(key: `q:${string}`): string {
+  return key.slice(2);
+}
+
+function formatAnswerCell(v: unknown): string {
+  if (v === undefined || v === null || v === '') return '—';
+  if (Array.isArray(v)) return v.length ? v.map(String).join(', ') : '—';
+  if (typeof v === 'object') {
+    const o = v as Record<string, unknown>;
+    if ('lat' in o && 'lng' in o) {
+      return `${Number(o.lat).toFixed(5)}, ${Number(o.lng).toFixed(5)}`;
+    }
+    if ('ward' in o || 'village' in o || 'county' in o) {
+      return [o.county, o.subcounty ?? o.subCounty, o.ward, o.village]
+        .filter(Boolean)
+        .map(String)
+        .join(' · ') || '—';
+    }
+    return JSON.stringify(v);
+  }
+  return String(v);
+}
 
 type SavedView = {
   id: string;
@@ -103,17 +139,6 @@ function loadViews(): SavedView[] {
 function persistViews(views: SavedView[]) {
   localStorage.setItem(VIEWS_KEY, JSON.stringify(views));
 }
-
-const defaultVisible: ColumnKey[] = [
-  'gender',
-  'age',
-  'county',
-  'subcounty',
-  'ward',
-  'village',
-  'agent',
-  'submitted',
-];
 
 export type SurveyDataExplorerProps = {
   surveyId: string;
@@ -155,7 +180,8 @@ export function SurveyDataExplorer({
   const [sortBy, setSortBy] = useState('submitted_at');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [groupBy, setGroupBy] = useState<string>('none');
-  const [visibleColumns, setVisibleColumns] = useState<ColumnKey[]>(defaultVisible);
+  const [visibleColumns, setVisibleColumns] = useState<ColumnKey[]>(DEFAULT_META_VISIBLE);
+  const [columnsReady, setColumnsReady] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [notes, setNotes] = useState('');
@@ -174,6 +200,29 @@ export function SurveyDataExplorer({
       setQuestions(normalizeQuestions(s.questions));
     });
   }, [surveyId, questionsProp]);
+
+  const allColumns = useMemo(() => {
+    const qCols = questions.map((q) => ({
+      key: questionColumnKey(q.id) as ColumnKey,
+      label: q.label,
+    }));
+    return [...META_COLUMNS, ...qCols];
+  }, [questions]);
+
+  // Default view: agent + submitted + every survey question (headers = question text).
+  useEffect(() => {
+    setColumnsReady(false);
+    setVisibleColumns(DEFAULT_META_VISIBLE);
+  }, [surveyId]);
+
+  useEffect(() => {
+    if (!questions.length || columnsReady) return;
+    setVisibleColumns([
+      ...DEFAULT_META_VISIBLE,
+      ...questions.map((q) => questionColumnKey(q.id)),
+    ]);
+    setColumnsReady(true);
+  }, [questions, columnsReady]);
 
   useEffect(() => {
     if (facetsProp) setFacets(facetsProp);
@@ -250,12 +299,17 @@ export function SurveyDataExplorer({
   const wards = useMemo(() => facets?.wards || [], [facets]);
   const answerQuestion = facets?.filterable_questions.find((q) => q.id === answerQuestionId);
 
-  const SORTABLE_COLUMNS: Partial<Record<ColumnKey, string>> = {
+  const SORTABLE_COLUMNS: Partial<Record<MetaColumnKey, string>> = {
     submitted: 'submitted_at',
     quality: 'quality_score',
     lifecycle: 'lifecycle_stage',
     status: 'status',
   };
+
+  const activeColumns = useMemo(
+    () => allColumns.filter((c) => visibleColumns.includes(c.key)),
+    [allColumns, visibleColumns],
+  );
 
   const grouped = useMemo(() => {
     if (groupBy === 'none') return [{ key: 'All', items: rows }];
@@ -358,6 +412,15 @@ export function SurveyDataExplorer({
   };
 
   const renderCell = (r: SurveyResponse, key: ColumnKey) => {
+    if (isQuestionColumn(key)) {
+      const qid = questionIdFromColumn(key);
+      const text = formatAnswerCell(r.answers?.[qid]);
+      return (
+        <span className="block max-w-[220px] truncate" title={text === '—' ? undefined : text}>
+          {text}
+        </span>
+      );
+    }
     switch (key) {
       case 'id':
         return <span className="font-mono text-xs">{r.id.slice(0, 8)}…</span>;
@@ -378,17 +441,23 @@ export function SurveyDataExplorer({
       case 'phone':
         return r.respondent.phone_number || '—';
       case 'gender':
-        return r.respondent.gender || '—';
+        return r.respondent.gender || formatAnswerCell(r.answers?.lari_gender);
       case 'age':
-        return r.respondent.age ?? '—';
+        return r.respondent.age ?? formatAnswerCell(r.answers?.lari_age);
       case 'county':
         return r.location.county;
       case 'subcounty':
         return r.location.subcounty;
-      case 'ward':
-        return r.location.ward;
-      case 'village':
-        return r.location.village;
+      case 'ward': {
+        const w = r.location.ward;
+        if (w && w !== 'Unknown Ward') return w;
+        return formatAnswerCell(r.answers?.lari_ward);
+      }
+      case 'village': {
+        const v = r.location.village;
+        if (v && v !== 'Unknown Village') return v;
+        return formatAnswerCell(r.answers?.lari_village);
+      }
       case 'agent':
         return r.agent_name || r.agent_id.slice(0, 8);
       case 'submitted':
@@ -555,10 +624,10 @@ export function SurveyDataExplorer({
               <ChevronDown className="ml-1 h-3.5 w-3.5" />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-52">
-            <DropdownMenuLabel>Visible columns</DropdownMenuLabel>
+          <DropdownMenuContent align="end" className="max-h-[70vh] w-72 overflow-y-auto">
+            <DropdownMenuLabel>Meta</DropdownMenuLabel>
             <DropdownMenuSeparator />
-            {ALL_COLUMNS.map((c) => (
+            {META_COLUMNS.map((c) => (
               <DropdownMenuCheckboxItem
                 key={c.key}
                 checked={visibleColumns.includes(c.key)}
@@ -567,6 +636,24 @@ export function SurveyDataExplorer({
                 {c.label}
               </DropdownMenuCheckboxItem>
             ))}
+            {questions.length > 0 ? (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuLabel>Survey questions</DropdownMenuLabel>
+                {questions.map((q) => {
+                  const key = questionColumnKey(q.id);
+                  return (
+                    <DropdownMenuCheckboxItem
+                      key={key}
+                      checked={visibleColumns.includes(key)}
+                      onCheckedChange={() => toggleCol(key)}
+                    >
+                      <span className="line-clamp-2 text-left">{q.label}</span>
+                    </DropdownMenuCheckboxItem>
+                  );
+                })}
+              </>
+            ) : null}
           </DropdownMenuContent>
         </DropdownMenu>
         <DropdownMenu>
@@ -645,19 +732,22 @@ export function SurveyDataExplorer({
                         {group.key} ({group.items.length})
                       </div>
                     ) : null}
-                    <table className="ledger-table w-full min-w-[900px]">
+                    <table className="ledger-table w-full min-w-max">
                       <thead className="sticky top-0 z-[5] bg-card shadow-sm">
                         <tr>
                           <th className="w-10">
                             <span className="sr-only">Select</span>
                           </th>
-                          {ALL_COLUMNS.filter((c) => visibleColumns.includes(c.key)).map((c) => {
-                            const sortField = SORTABLE_COLUMNS[c.key];
+                          {activeColumns.map((c) => {
+                            const sortField = !isQuestionColumn(c.key)
+                              ? SORTABLE_COLUMNS[c.key as MetaColumnKey]
+                              : undefined;
                             const isSorted = sortField && sortBy === sortField;
                             return (
                             <th
                               key={c.key}
-                              className={`whitespace-nowrap text-xs ${sortField ? 'cursor-pointer' : ''}`}
+                              className={`max-w-[200px] whitespace-normal text-left text-xs leading-snug ${sortField ? 'cursor-pointer' : ''}`}
+                              title={c.label}
                               onClick={() => {
                                 if (!sortField) return;
                                 if (sortBy === sortField) {
@@ -668,7 +758,7 @@ export function SurveyDataExplorer({
                                 }
                               }}
                             >
-                              {c.label}
+                              <span className="line-clamp-3">{c.label}</span>
                               {isSorted ? (sortOrder === 'desc' ? ' ↓' : ' ↑') : ''}
                             </th>
                           );})}
@@ -687,8 +777,8 @@ export function SurveyDataExplorer({
                                 onCheckedChange={() => toggleRow(r.id)}
                               />
                             </td>
-                            {ALL_COLUMNS.filter((c) => visibleColumns.includes(c.key)).map((c) => (
-                              <td key={c.key} className="whitespace-nowrap text-sm">
+                            {activeColumns.map((c) => (
+                              <td key={c.key} className="align-top text-sm">
                                 {renderCell(r, c.key)}
                               </td>
                             ))}

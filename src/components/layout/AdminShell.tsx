@@ -14,6 +14,7 @@ const primaryNav = [
 const secondaryNav = [
   { title: 'Review queue', url: '/dashboard/review', end: false },
   { title: 'Agents', url: '/dashboard/agents', end: false },
+  { title: 'Users', url: '/dashboard/users', end: false },
   { title: 'Projects', url: '/dashboard/projects', end: false },
 ];
 
@@ -25,6 +26,7 @@ function pageTitle(pathname: string) {
   if (pathname.startsWith('/dashboard/surveys/')) return 'Survey workspace';
   if (pathname.startsWith('/dashboard/surveys')) return 'Surveys';
   if (pathname.startsWith('/dashboard/agents')) return 'Agents';
+  if (pathname.startsWith('/dashboard/users')) return 'Users';
   if (pathname === '/dashboard' || pathname === '/dashboard/') return 'Research home';
   return 'Tafiti Admin';
 }

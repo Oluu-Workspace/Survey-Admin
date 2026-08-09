@@ -4,7 +4,6 @@ import {
   AGE_BANDS,
   ageBand,
   isAgeNumberQuestion,
-  isChartableAnalyticsRow,
   isIdentityQuestion,
 } from './chartableQuestions';
 
@@ -388,8 +387,7 @@ export function openPrintableReport(opts: {
     filterSummary,
   } = opts;
   void _analyticsFromApi;
-  const chartQuestions = bundle.perQuestion.filter(isChartableAnalyticsRow);
-  const reportBundle = { ...bundle, perQuestion: chartQuestions };
+  const reportBundle = { ...bundle, perQuestion: bundle.perQuestion };
   const barsByPct = (items: { option: string; count: number; pct: number }[]) => {
     const safe = items.length ? items : [];
     return safe
@@ -650,13 +648,27 @@ export function openPrintableReport(opts: {
           ${choiceBlock(q.distribution || [], '', insightBlock)}
         </section>`;
       }
+      if (q.kind === 'text' || q.kind === 'media') {
+        const distribution = q.distribution || [];
+        if (!distribution.length) {
+          return `<section class="question">${header}
+            <div class="meta">n=${q.count.toLocaleString()} · ${q.kind === 'media' ? 'media capture' : 'open text'}</div>
+            <p class="meta">Responses recorded — no chartable distribution for this field type.</p>
+            ${insightBlock}
+          </section>`;
+        }
+        return `<section class="question">${header}
+          <div class="meta">n=${q.count.toLocaleString()} · top verbatim answers (truncated)</div>
+          ${choiceBlock(distribution, '', insightBlock)}
+        </section>`;
+      }
       if ((q.distribution?.length || 0) > 0) {
         return `<section class="question">${header}
           <div class="meta">n=${q.count.toLocaleString()} · top responses</div>
           ${choiceBlock(q.distribution || [], '', insightBlock)}
         </section>`;
       }
-      return '';
+      return `<section class="question muted">${header}<p class="meta">No analyzable answers for this question.</p>${insightBlock}</section>`;
     })
     .filter(Boolean);
 
@@ -742,8 +754,8 @@ export function openPrintableReport(opts: {
   const comparisonBlocks =
     comparisons && comparisons.length
       ? (() => {
-          const capped = comparisons.slice(0, 12);
-          return capped
+          const allComparisons = comparisons || [];
+          return allComparisons
             .map((c) => {
               const activeRows = (c.rows || []).filter((row) => row.total > 0);
               if (!activeRows.length) return '';
@@ -767,7 +779,7 @@ export function openPrintableReport(opts: {
   const compareLabel = comparisons?.[0]?.compare_by_label || 'segment';
   const fetchedNote =
     totalResponsesFetched != null
-      ? `<p class="meta">${totalResponsesFetched.toLocaleString()} responses · ${reportBundle.perQuestion.length} chartable questions (names/phones/notes excluded).</p>`
+      ? `<p class="meta">${totalResponsesFetched.toLocaleString()} responses · ${reportBundle.perQuestion.length} questions analyzed.</p>`
       : '';
 
   const reportTitle = escapeHtml(surveyTitle);
@@ -786,7 +798,7 @@ export function openPrintableReport(opts: {
 
   const filterNote = filterSummary
     ? `<p class="note"><strong>Filters applied:</strong> ${escapeHtml(filterSummary)}. Charts reflect this subset only.</p>`
-    : '<p class="note">Clean dataset — names, phones, and free-text identity fields are excluded from charts.</p>';
+    : '<p class="note">Full analysis — every survey question with available breakdowns, charts, and tables.</p>';
 
   pages.push({
     title: 'Cover & summary',
@@ -801,7 +813,7 @@ export function openPrintableReport(opts: {
       ${filterNote}
       <div class="grid grid-3">
         <div class="cell"><div class="label">Responses</div><div class="val">${bundle.totalIncluded.toLocaleString()}</div></div>
-        <div class="cell"><div class="label">Chart questions</div><div class="val">${reportBundle.perQuestion.length}</div></div>
+        <div class="cell"><div class="label">Questions analyzed</div><div class="val">${reportBundle.perQuestion.length}</div></div>
         <div class="cell"><div class="label">Completion</div><div class="val">${bundle.completionRate}%</div></div>
       </div>
       <h2>Executive summary</h2>
@@ -811,9 +823,9 @@ export function openPrintableReport(opts: {
       ${keyFindingsHtml}
       <h2>How to read this report</h2>
       <ul>
-        <li>Each chartable question includes pie, donut, bar, and data table views.</li>
+        <li>Every question includes charts and tables where data allows (choice, numeric, text samples).</li>
         <li>Percentages are shares of answers for that question — read alongside counts.</li>
-        <li>Identity fields (names, phones) are never charted.</li>
+        <li>Identity fields show response counts; verbatim values are truncated in tables.</li>
       </ul>`,
   });
 
@@ -916,62 +928,52 @@ export function openPrintableReport(opts: {
 <style>
   @page {
     size: A4 landscape;
-    margin: 10mm 8mm 14mm 8mm;
-    @bottom-left {
-      content: "Tafiti · ${printDateSafe}";
-      font-size: 8pt;
-      color: #5A6B7D;
-    }
-    @bottom-right {
-      content: "Page " counter(page) " of " counter(pages);
-      font-size: 8pt;
-      color: #5A6B7D;
-    }
+    margin: 0;
   }
   * { box-sizing: border-box; }
-  body { font-family: "Source Sans 3", system-ui, sans-serif; color: #1A2838; font-size: 11px; line-height: 1.4; width: 100%; max-width: none; margin: 0; padding: 12px 14px 24px; background: #EEF2F5; }
+  body { font-family: "Source Sans 3", system-ui, sans-serif; color: #1A2838; font-size: 11px; line-height: 1.35; width: 100%; max-width: none; margin: 0; padding: 0; background: #fff; }
   .report-page {
     background: #fff;
-    border: 1px solid #D3DAE3;
-    padding: 12px 14px 10px;
-    margin: 0 auto 18px;
+    border: 0;
+    padding: 6mm 7mm 5mm;
+    margin: 0;
     width: 100%;
     page-break-after: always;
     break-after: page;
   }
-  .report-page:last-of-type { page-break-after: auto; break-after: auto; margin-bottom: 0; }
+  .report-page:last-of-type { page-break-after: auto; break-after: auto; }
   .page-topbar {
-    display: flex; justify-content: space-between; align-items: baseline; gap: 12px;
-    font-size: 9px; color: #5A6B7D; border-bottom: 1px solid #E8EDF2; padding-bottom: 6px; margin-bottom: 8px;
+    display: flex; justify-content: space-between; align-items: baseline; gap: 8px;
+    font-size: 9px; color: #5A6B7D; border-bottom: 1px solid #E8EDF2; padding-bottom: 4px; margin-bottom: 6px;
   }
   .page-top-title { font-family: "Instrument Sans", sans-serif; font-weight: 600; color: #1B4D3E; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .page-banner { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+  .page-banner { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
   .page-num-badge {
     font-family: "IBM Plex Mono", monospace; font-size: 10px; font-weight: 600;
     background: #1B4D3E; color: #fff; padding: 4px 8px; letter-spacing: 0.02em;
   }
   .page-section { font-family: "Instrument Sans", sans-serif; font-size: 12px; font-weight: 600; color: #1A2838; }
   .page-footer {
-    display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap;
-    margin-top: 16px; padding-top: 8px; border-top: 1px solid #D3DAE3;
+    display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap;
+    margin-top: 10px; padding-top: 6px; border-top: 1px solid #D3DAE3;
     font-size: 9px; color: #5A6B7D;
   }
-  .cover { background: linear-gradient(135deg, #1B4D3E 0%, #2d6b58 100%); color: #fff; padding: 18px 20px; margin: 0 0 14px; }
+  .cover { background: linear-gradient(135deg, #1B4D3E 0%, #2d6b58 100%); color: #fff; padding: 14px 16px; margin: 0 0 10px; }
   .cover h1 { font-family: "Instrument Sans", sans-serif; font-size: 24px; margin: 0 0 6px; font-weight: 700; }
   .cover .sub { opacity: 0.92; font-size: 12px; max-width: 70em; }
   .cover .meta { color: rgba(255,255,255,0.85); font-size: 11px; margin-top: 10px; }
   .brand { font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; opacity: 0.8; margin-bottom: 8px; }
-  h2 { font-family: "Instrument Sans", sans-serif; font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; margin: 18px 0 8px; border-bottom: 2px solid #1B4D3E; padding-bottom: 4px; color: #1B4D3E; }
+  h2 { font-family: "Instrument Sans", sans-serif; font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; margin: 12px 0 6px; border-bottom: 2px solid #1B4D3E; padding-bottom: 3px; color: #1B4D3E; }
   h2:first-child { margin-top: 0; }
   h3 { font-family: "Instrument Sans", sans-serif; font-size: 12px; margin: 0; font-weight: 600; }
   .meta { color: #5A6B7D; font-size: 10px; }
   .mono { font-family: "IBM Plex Mono", monospace; }
-  .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 14px 0; }
+  .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin: 10px 0; }
   .grid-3 { grid-template-columns: repeat(3, 1fr); }
   .cell { border: 1px solid #D3DAE3; padding: 10px; background: #fafbfc; }
   .label { font-size: 9px; text-transform: uppercase; letter-spacing: 0.06em; color: #5A6B7D; }
   .val { font-family: "IBM Plex Mono", monospace; font-size: 18px; margin-top: 4px; font-weight: 500; }
-  .question { border: 1px solid #D3DAE3; padding: 12px 14px; margin: 0 0 12px; break-inside: avoid; page-break-inside: avoid; }
+  .question { border: 1px solid #D3DAE3; padding: 8px 10px; margin: 0 0 8px; break-inside: avoid; page-break-inside: avoid; }
   .question.muted { opacity: 0.75; background: #f8f9fa; }
   .q-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; margin-bottom: 6px; }
   .q-num { font-family: "IBM Plex Mono", monospace; font-size: 10px; color: #1B4D3E; font-weight: 600; }
@@ -993,13 +995,13 @@ export function openPrintableReport(opts: {
   .stats { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 10px; }
   .stats th, .stats td { border: 1px solid #D3DAE3; padding: 5px 8px; text-align: left; }
   .stats th { background: #EEF2F5; color: #5A6B7D; font-size: 9px; text-transform: uppercase; }
-  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; break-inside: avoid; }
-  .two-charts { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; break-inside: avoid; }
-  .chart-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 10px 0; break-inside: avoid; }
-  .chart-panel { min-width: 0; border: 1px solid #E8EDF2; padding: 10px; background: #fafbfc; }
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; break-inside: avoid; }
+  .two-charts { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; break-inside: avoid; }
+  .chart-row { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin: 6px 0; break-inside: avoid; }
+  .chart-panel { min-width: 0; border: 1px solid #E8EDF2; padding: 6px; background: #fafbfc; }
   .chart-col { min-width: 0; }
-  .pie-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 10px 0 14px; }
-  .mini-chart { border: 1px solid #D3DAE3; padding: 10px; break-inside: avoid; }
+  .pie-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin: 6px 0 8px; }
+  .mini-chart { border: 1px solid #D3DAE3; padding: 6px; break-inside: avoid; }
   .mini-chart h3 { font-size: 11px; margin: 0 0 8px; }
   .pie-card { display: flex; align-items: flex-start; gap: 12px; }
   .pie-svg { flex: 0 0 auto; }
@@ -1009,16 +1011,16 @@ export function openPrintableReport(opts: {
   .col-chart { display: block; margin: 4px 0 8px; }
   .toc { font-size: 10px; color: #5A6B7D; margin: 0 0 14px; }
   .note { padding: 8px 10px; background: #EEF2F5; border-left: 3px solid #1B4D3E; color: #3d4f63; font-size: 10px; }
-  .toolbar { position: sticky; top: 0; z-index: 5; background: #EEF2F5; padding: 8px 0 12px; margin-bottom: 4px; }
+  .toolbar { position: sticky; top: 0; z-index: 5; background: #fff; padding: 6px 8px 8px; margin-bottom: 0; border-bottom: 1px solid #E8EDF2; }
   @media print {
     .noprint { display: none !important; }
     body { padding: 0; margin: 0; width: 100%; max-width: none; background: #fff; }
     .report-page {
-      border: 0; margin: 0; padding: 0 0 4px;
+      border: 0; margin: 0; padding: 6mm 7mm 5mm;
       page-break-after: always; break-after: page;
     }
     .report-page:last-of-type { page-break-after: auto; break-after: auto; }
-    .cover { margin: 0 0 10px; }
+    .cover { margin: 0 0 8px; }
     .two-charts, .question { break-inside: avoid; page-break-inside: avoid; }
   }
 </style></head><body>

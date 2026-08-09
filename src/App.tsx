@@ -12,6 +12,7 @@ import ReviewWorkspace from "./pages/ReviewWorkspace";
 import ProjectDetail from "./pages/ProjectDetail";
 import Projects from "./pages/Projects";
 import Agents from "./pages/Agents";
+import Users from "./pages/Users";
 import Surveys from "./pages/Surveys";
 import SurveyDetail from "./pages/SurveyDetail";
 import NotFound from "./pages/NotFound";
@@ -41,6 +42,7 @@ const App = () => (
               <Route path="projects" element={<Projects />} />
               <Route path="projects/:projectId" element={<ProjectDetail />} />
               <Route path="agents" element={<Agents />} />
+              <Route path="users" element={<Users />} />
               <Route path="surveys" element={<Surveys />} />
               <Route path="surveys/:surveyId" element={<SurveyDetail />} />
             </Route>

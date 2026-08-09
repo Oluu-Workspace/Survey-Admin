@@ -7,6 +7,7 @@ import { TablePagination } from '@/components/TablePagination';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Select,
   SelectContent,
@@ -22,10 +23,20 @@ interface Agent {
   email: string;
   phone?: string;
   status: string;
+  role?: string;
   ward?: string;
   village?: string;
+  county?: string;
+  subcounty?: string;
   surveys_completed?: number;
 }
+
+type SurveyAssignRow = {
+  id: string;
+  title: string;
+  status: string;
+  assigned: boolean;
+};
 
 const emptyForm = {
   first_name: '',
@@ -35,6 +46,8 @@ const emptyForm = {
   password: '',
   ward: '',
   village: '',
+  county: '',
+  subcounty: '',
 };
 
 const Agents = () => {
@@ -43,17 +56,22 @@ const Agents = () => {
   const [statusFilter, setStatusFilter] = useState('all');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
+  const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [form, setForm] = useState(emptyForm);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+  const [assignments, setAssignments] = useState<SurveyAssignRow[]>([]);
+  const [assignBusy, setAssignBusy] = useState(false);
 
   const load = async () => {
     setLoading(true);
     try {
       const data = await agentsAPI.getAll({ limit: 200 });
-      setAgents(data.agents || data || []);
+      const list = (data.agents || data || []) as Agent[];
+      // Field agents only on this page (staff live under Users)
+      setAgents(list.filter((a) => (a.role || 'agent') === 'agent' || !a.role));
     } catch {
       toast.error('Could not load agents');
       setAgents([]);
@@ -69,11 +87,12 @@ const Agents = () => {
   const filtered = useMemo(() => {
     const q = searchTerm.toLowerCase();
     return agents.filter((a) => {
+      const status = a.status === 'inactive' ? 'suspended' : a.status;
       const hay = [a.first_name, a.last_name, a.email, a.ward, a.village]
         .filter(Boolean)
         .join(' ')
         .toLowerCase();
-      return (!q || hay.includes(q)) && (statusFilter === 'all' || a.status === statusFilter);
+      return (!q || hay.includes(q)) && (statusFilter === 'all' || status === statusFilter);
     });
   }, [agents, searchTerm, statusFilter]);
 
@@ -90,14 +109,42 @@ const Agents = () => {
 
   const selected = selectedId ? agents.find((a) => a.id === selectedId) || null : null;
 
+  useEffect(() => {
+    if (!selectedId) {
+      setAssignments([]);
+      return;
+    }
+    void agentsAPI
+      .getSurveyAssignments(selectedId)
+      .then((data) => setAssignments(data.surveys || []))
+      .catch(() => setAssignments([]));
+  }, [selectedId]);
+
   const setStatus = async (id: string, next: 'active' | 'suspended') => {
     try {
       if (next === 'active') await agentsAPI.activate(id);
       else await agentsAPI.deactivate(id);
-      toast.success(next === 'active' ? 'Agent can sign in to the field app' : 'Agent sign-in blocked');
+      toast.success(next === 'active' ? 'Agent can sign in' : 'Agent sign-in blocked');
       await load();
     } catch {
       toast.error('Update failed');
+    }
+  };
+
+  const updateAgentPassword = async (id: string) => {
+    if (!form.password || form.password.length < 6) {
+      toast.error('Password must be 6+ characters');
+      return;
+    }
+    setSaving(true);
+    try {
+      await agentsAPI.update(id, { password: form.password });
+      toast.success('Password updated — agent can log in now');
+      setForm((f) => ({ ...f, password: '' }));
+    } catch (err: any) {
+      toast.error(err?.response?.data?.error || 'Password update failed');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -118,8 +165,9 @@ const Agents = () => {
         last_name: form.last_name.trim(),
         email: form.email.trim(),
         status: 'active',
+        role: 'agent',
       });
-      toast.success('Agent added');
+      toast.success('Agent added — they can log in with that password');
       setCreating(false);
       setForm(emptyForm);
       await load();
@@ -128,6 +176,76 @@ const Agents = () => {
     } finally {
       setSaving(false);
     }
+  };
+
+  const saveProfile = async () => {
+    if (!selectedId) return;
+    setSaving(true);
+    try {
+      await agentsAPI.update(selectedId, {
+        first_name: form.first_name.trim(),
+        last_name: form.last_name.trim(),
+        phone: form.phone.trim() || null,
+        county: form.county.trim() || null,
+        subcounty: form.subcounty.trim() || null,
+        ward: form.ward.trim() || null,
+        village: form.village.trim() || null,
+      });
+      toast.success('Agent updated');
+      setEditing(false);
+      await load();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.error || 'Update failed');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const deleteAgent = async (id: string) => {
+    if (!window.confirm('Delete this agent? They will lose access and be unassigned from surveys.')) {
+      return;
+    }
+    setSaving(true);
+    try {
+      await agentsAPI.delete(id);
+      toast.success('Agent deleted');
+      setSelectedId(null);
+      await load();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.error || 'Delete failed');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const saveAssignments = async () => {
+    if (!selectedId) return;
+    setAssignBusy(true);
+    try {
+      const survey_ids = assignments.filter((s) => s.assigned).map((s) => s.id);
+      await agentsAPI.setSurveyAssignments(selectedId, survey_ids);
+      toast.success('Survey assignments saved');
+    } catch (err: any) {
+      toast.error(err?.response?.data?.error || 'Could not save assignments');
+    } finally {
+      setAssignBusy(false);
+    }
+  };
+
+  const startEdit = (agent: Agent) => {
+    setEditing(true);
+    setCreating(false);
+    setForm({
+      first_name: agent.first_name || '',
+      last_name: agent.last_name || '',
+      email: agent.email || '',
+      phone: agent.phone || '',
+      password: '',
+      ward: agent.ward || '',
+      village: agent.village || '',
+      county: agent.county || '',
+      subcounty: agent.subcounty || '',
+    });
   };
 
   if (loading) {
@@ -140,10 +258,10 @@ const Agents = () => {
 
   return (
     <div className="flex w-full flex-col gap-5 lg:flex-row lg:items-start">
-      <div className={`min-w-0 flex-1 space-y-4 ${selected || creating ? 'lg:max-w-[58%]' : ''}`}>
+      <div className={`min-w-0 flex-1 space-y-4 ${selected || creating ? 'lg:max-w-[55%]' : ''}`}>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <p className="text-sm text-muted-foreground">
-            {filtered.length} agent{filtered.length === 1 ? '' : 's'}
+            {filtered.length} field agent{filtered.length === 1 ? '' : 's'}
             {statusFilter !== 'all' ? ` · ${statusFilter}` : ''}
           </p>
           <Button
@@ -151,7 +269,9 @@ const Agents = () => {
             className="rounded-sm"
             onClick={() => {
               setSelectedId(null);
+              setEditing(false);
               setCreating(true);
+              setForm(emptyForm);
             }}
           >
             <Plus className="mr-1.5 h-4 w-4" />
@@ -200,13 +320,16 @@ const Agents = () => {
               <tbody>
                 {paginatedAgents.map((agent) => {
                   const active = selectedId === agent.id;
+                  const status = agent.status === 'inactive' ? 'suspended' : agent.status;
                   return (
                     <tr
                       key={agent.id}
                       className={`cursor-pointer ${active ? 'bg-primary/5' : ''}`}
                       onClick={() => {
                         setCreating(false);
+                        setEditing(false);
                         setSelectedId(agent.id);
+                        setForm(emptyForm);
                       }}
                     >
                       <td className="font-display font-medium">
@@ -217,7 +340,7 @@ const Agents = () => {
                         {[agent.ward, agent.village].filter(Boolean).join(' · ') || '—'}
                       </td>
                       <td>
-                        <Stamp status={agent.status} />
+                        <Stamp status={status} />
                       </td>
                     </tr>
                   );
@@ -239,10 +362,10 @@ const Agents = () => {
       </div>
 
       {(selected || creating) && (
-        <aside className="w-full shrink-0 border border-border bg-card lg:sticky lg:top-4 lg:w-[380px]">
+        <aside className="w-full shrink-0 border border-border bg-card lg:sticky lg:top-4 lg:w-[400px]">
           <div className="flex items-center justify-between border-b border-border px-4 py-3">
             <h2 className="font-display text-sm font-semibold">
-              {creating ? 'Add agent' : 'Agent detail'}
+              {creating ? 'Add agent' : editing ? 'Edit agent' : 'Agent detail'}
             </h2>
             <Button
               size="icon"
@@ -251,21 +374,25 @@ const Agents = () => {
               onClick={() => {
                 setSelectedId(null);
                 setCreating(false);
+                setEditing(false);
               }}
             >
               <X className="h-4 w-4" />
             </Button>
           </div>
 
-          {creating ? (
+          {creating || editing ? (
             <div className="space-y-3 p-4">
               {(
                 [
                   ['first_name', 'First name'],
                   ['last_name', 'Last name'],
-                  ['email', 'Email'],
-                  ['password', 'Password'],
+                  ...(creating
+                    ? ([['email', 'Email'], ['password', 'Password']] as const)
+                    : []),
                   ['phone', 'Phone'],
+                  ['county', 'County'],
+                  ['subcounty', 'Sub county'],
                   ['ward', 'Ward'],
                   ['village', 'Village'],
                 ] as const
@@ -286,6 +413,7 @@ const Agents = () => {
                   className="flex-1 rounded-sm"
                   onClick={() => {
                     setCreating(false);
+                    setEditing(false);
                     setForm(emptyForm);
                   }}
                 >
@@ -293,7 +421,7 @@ const Agents = () => {
                 </Button>
                 <Button
                   className="flex-1 rounded-sm"
-                  onClick={() => void createAgent()}
+                  onClick={() => void (creating ? createAgent() : saveProfile())}
                   disabled={saving}
                 >
                   {saving ? 'Saving…' : 'Save'}
@@ -307,7 +435,7 @@ const Agents = () => {
                   {selected.first_name} {selected.last_name}
                 </div>
                 <div className="mt-1">
-                  <Stamp status={selected.status} />
+                  <Stamp status={selected.status === 'inactive' ? 'suspended' : selected.status} />
                 </div>
               </div>
               <dl className="space-y-3 text-sm">
@@ -315,12 +443,10 @@ const Agents = () => {
                   [
                     ['Email', selected.email],
                     ['Phone', selected.phone || '—'],
+                    ['County', selected.county || '—'],
                     ['Ward', selected.ward || '—'],
                     ['Village', selected.village || '—'],
-                    [
-                      'Surveys completed',
-                      String(selected.surveys_completed ?? 0),
-                    ],
+                    ['Surveys completed', String(selected.surveys_completed ?? 0)],
                   ] as const
                 ).map(([label, value]) => (
                   <div key={label}>
@@ -331,7 +457,74 @@ const Agents = () => {
                   </div>
                 ))}
               </dl>
-              <div className="border-t border-border pt-4">
+
+              <div className="space-y-2 border-t border-border pt-4">
+                <div className="font-display text-xs uppercase tracking-wide text-muted-foreground">
+                  Survey assignments
+                </div>
+                {assignments.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">No surveys yet.</p>
+                ) : (
+                  <div className="max-h-40 space-y-2 overflow-y-auto">
+                    {assignments.map((s) => (
+                      <label key={s.id} className="flex cursor-pointer items-start gap-2 text-sm">
+                        <Checkbox
+                          checked={s.assigned}
+                          onCheckedChange={(checked) =>
+                            setAssignments((rows) =>
+                              rows.map((r) =>
+                                r.id === s.id ? { ...r, assigned: Boolean(checked) } : r,
+                              ),
+                            )
+                          }
+                        />
+                        <span>
+                          <span className="font-medium">{s.title}</span>
+                          <span className="ml-1 text-xs text-muted-foreground">({s.status})</span>
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                )}
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="w-full rounded-sm"
+                  disabled={assignBusy || assignments.length === 0}
+                  onClick={() => void saveAssignments()}
+                >
+                  {assignBusy ? 'Saving…' : 'Save assignments'}
+                </Button>
+              </div>
+
+              <div className="space-y-3 border-t border-border pt-4">
+                <div className="space-y-1.5">
+                  <Label className="font-display text-xs uppercase tracking-wide">
+                    Reset password
+                  </Label>
+                  <Input
+                    type="password"
+                    className="rounded-sm"
+                    placeholder="New password (6+ chars)"
+                    value={form.password}
+                    onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
+                  />
+                  <Button
+                    variant="outline"
+                    className="w-full rounded-sm"
+                    disabled={saving || !form.password || form.password.length < 6}
+                    onClick={() => void updateAgentPassword(selected.id)}
+                  >
+                    {saving ? 'Saving…' : 'Save password'}
+                  </Button>
+                </div>
+                <Button
+                  variant="outline"
+                  className="w-full rounded-sm"
+                  onClick={() => startEdit(selected)}
+                >
+                  Edit profile
+                </Button>
                 {selected.status !== 'active' ? (
                   <Button
                     className="w-full rounded-sm"
@@ -348,6 +541,14 @@ const Agents = () => {
                     Block sign-in
                   </Button>
                 )}
+                <Button
+                  variant="destructive"
+                  className="w-full rounded-sm"
+                  disabled={saving}
+                  onClick={() => void deleteAgent(selected.id)}
+                >
+                  Delete agent
+                </Button>
               </div>
             </div>
           ) : null}
