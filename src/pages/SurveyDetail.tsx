@@ -25,8 +25,11 @@ import {
   collectionPeriodFromResponses,
   generateQuestionInsight,
 } from '@/lib/researchInsights';
+import { ReportGenerationWizard } from '@/components/ReportGenerationWizard';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
@@ -100,6 +103,14 @@ const SurveyDetail = () => {
     answerQuestionId: '',
     answerValue: '',
   });
+  const [metaForm, setMetaForm] = useState({
+    title: '',
+    description: '',
+    target_submissions: 0,
+    ward: '',
+    village: '',
+  });
+  const [savingMeta, setSavingMeta] = useState(false);
 
   const setTab = (next: string) => {
     const params = new URLSearchParams(searchParams);
@@ -119,6 +130,14 @@ const SurveyDetail = () => {
       ]);
       const s = surveyRes.survey || surveyRes;
       setSurvey(s);
+      const region = Array.isArray(s.assigned_regions) ? s.assigned_regions[0] : null;
+      setMetaForm({
+        title: s.title || '',
+        description: s.description || '',
+        target_submissions: Number(s.target_submissions) || 0,
+        ward: s.ward || region?.ward || '',
+        village: s.village || region?.village || '',
+      });
       setAgents(agentsRes.agents || agentsRes || []);
       setResponses(responsesRes.responses || []);
       setResponseTotal(responsesRes.pagination?.total ?? responsesRes.responses?.length ?? 0);
@@ -336,9 +355,10 @@ const SurveyDetail = () => {
           analyticsFilters.answerQuestionId;
         filterParts.push(`${qLabel} = ${analyticsFilters.answerValue}`);
       }
-      const uniqueWards = Object.keys(reportBundle.byWard).filter(
-        (w) => w && w !== 'Unknown ward',
-      ).length;
+      const uniqueWards = Object.keys(reportBundle.byWard).filter((w) => {
+        const n = (w || '').trim().toLowerCase();
+        return n && n !== 'unknown ward' && n !== 'unknown';
+      }).length;
       const uniqueAgents = reportBundle.byAgent.filter((a) => a.count > 0).length;
       const result = openPrintableReport({
         surveyTitle: survey.title || 'Survey',
@@ -394,7 +414,15 @@ const SurveyDetail = () => {
     setExportBusy(true);
     try {
       toast.message('Exporting CSV…');
-      const rows = await fetchAllSurveyResponses(surveyId);
+      const rows = await fetchAllSurveyResponses(surveyId, {
+        agent_id: analyticsAgentId || undefined,
+        county: analyticsFilters.county || undefined,
+        ward: analyticsFilters.ward || undefined,
+        status: analyticsFilters.status || undefined,
+        lifecycle_stage: analyticsFilters.lifecycle || undefined,
+        answer_question_id: analyticsFilters.answerQuestionId || undefined,
+        answer_value: analyticsFilters.answerValue || undefined,
+      });
       exportResponsesCsv(survey.title || 'survey', questions, rows);
       toast.success(`Downloaded CSV (${rows.length} rows)`);
     } catch (err: unknown) {
@@ -402,6 +430,35 @@ const SurveyDetail = () => {
       toast.error(msg);
     } finally {
       setExportBusy(false);
+    }
+  };
+
+  const saveSurveyMeta = async () => {
+    if (!surveyId || !metaForm.title.trim()) {
+      toast.error('Title is required');
+      return;
+    }
+    setSavingMeta(true);
+    try {
+      const assigned_regions =
+        metaForm.ward || metaForm.village
+          ? [{ ward: metaForm.ward || undefined, village: metaForm.village || undefined }]
+          : survey.assigned_regions || [];
+      const res = await surveysAPI.update(surveyId, {
+        title: metaForm.title.trim(),
+        description: metaForm.description.trim(),
+        target_submissions: Number(metaForm.target_submissions) || 0,
+        ward: metaForm.ward || undefined,
+        village: metaForm.village || undefined,
+        assigned_regions,
+      });
+      const updated = res.survey || res;
+      setSurvey((prev: any) => ({ ...prev, ...updated }));
+      toast.success('Survey details saved — agents will see updates on next sync');
+    } catch (err: any) {
+      toast.error(err?.response?.data?.error || 'Could not save survey details');
+    } finally {
+      setSavingMeta(false);
     }
   };
 
@@ -503,6 +560,71 @@ const SurveyDetail = () => {
         </TabsList>
 
         <TabsContent value="overview" className="mt-4 space-y-4">
+          <div className="space-y-3 border border-border bg-card p-4">
+            <div>
+              <h2 className="font-display text-sm font-semibold">Questionnaire details</h2>
+              <p className="text-xs text-muted-foreground">
+                Edit title, description, and area. Question changes live on the Questions tab.
+              </p>
+            </div>
+            <div className="grid gap-3 md:grid-cols-2">
+              <div className="space-y-1.5 md:col-span-2">
+                <Label className="font-display text-xs uppercase tracking-wide">Title</Label>
+                <Input
+                  className="rounded-sm"
+                  value={metaForm.title}
+                  onChange={(e) => setMetaForm((f) => ({ ...f, title: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-1.5 md:col-span-2">
+                <Label className="font-display text-xs uppercase tracking-wide">Description</Label>
+                <Textarea
+                  className="rounded-sm"
+                  rows={2}
+                  value={metaForm.description}
+                  onChange={(e) => setMetaForm((f) => ({ ...f, description: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="font-display text-xs uppercase tracking-wide">Target submissions</Label>
+                <Input
+                  className="rounded-sm font-mono"
+                  type="number"
+                  min={0}
+                  value={metaForm.target_submissions}
+                  onChange={(e) =>
+                    setMetaForm((f) => ({ ...f, target_submissions: Number(e.target.value) }))
+                  }
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label className="font-display text-xs uppercase tracking-wide">Ward</Label>
+                  <Input
+                    className="rounded-sm"
+                    value={metaForm.ward}
+                    onChange={(e) => setMetaForm((f) => ({ ...f, ward: e.target.value }))}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="font-display text-xs uppercase tracking-wide">Village</Label>
+                  <Input
+                    className="rounded-sm"
+                    value={metaForm.village}
+                    onChange={(e) => setMetaForm((f) => ({ ...f, village: e.target.value }))}
+                  />
+                </div>
+              </div>
+            </div>
+            <Button
+              size="sm"
+              className="rounded-sm"
+              disabled={savingMeta}
+              onClick={() => void saveSurveyMeta()}
+            >
+              {savingMeta ? 'Saving…' : 'Save details'}
+            </Button>
+          </div>
           <SurveyInsightsDashboard surveyId={surveyId} />
           {responseTotal > 0 ? (
             <div className="flex flex-wrap gap-2">
@@ -512,8 +634,8 @@ const SurveyDetail = () => {
               <Button size="sm" variant="outline" className="rounded-sm" onClick={() => setTab('analysis')}>
                 Question analysis
               </Button>
-              <Button size="sm" variant="outline" className="rounded-sm" onClick={() => void runPdfReport()}>
-                Research report (PDF)
+              <Button size="sm" variant="outline" className="rounded-sm" onClick={() => setTab('report')}>
+                Report wizard
               </Button>
             </div>
           ) : null}
@@ -776,37 +898,28 @@ const SurveyDetail = () => {
         </TabsContent>
 
         <TabsContent value="report" className="mt-4">
-          <div className="space-y-4 border border-border bg-card p-6">
-            <h2 className="font-display text-lg font-semibold">Research report &amp; export</h2>
-            <p className="max-w-2xl text-sm text-muted-foreground">
-              Generate a publication-style report with executive summary, key findings, count vs percentage
-              graphs per question, ranked tables, geographic breakdowns, and conclusions — or download the
-              full anonymised dataset as CSV for statistical software.
-            </p>
-            <p className="text-sm">
-              <span className="ledger-count">{responseTotal.toLocaleString()}</span> responses in this survey.
-            </p>
-            <div className="flex flex-wrap gap-2">
-              <Button
-                className="rounded-sm"
-                disabled={exportBusy || responseTotal === 0}
-                onClick={() => void runPdfReport()}
-              >
-                {exportBusy ? 'Working…' : 'Download research report (PDF)'}
-              </Button>
-              <Button
-                variant="outline"
-                className="rounded-sm"
-                disabled={exportBusy || responseTotal === 0}
-                onClick={() => void runCsvExport()}
-              >
-                Export raw data (CSV)
-              </Button>
-              <Button variant="ghost" className="rounded-sm" onClick={() => setTab('analysis')}>
-                Back to analysis
-              </Button>
-            </div>
-          </div>
+          <ReportGenerationWizard
+            surveyTitle={survey.title || 'Survey'}
+            surveyDescription={survey.description}
+            responseTotal={responseTotal}
+            questionCount={questions.length}
+            facets={responseFacets}
+            filters={analyticsFilters}
+            onFiltersChange={(next) => setAnalyticsFilters((prev) => ({ ...prev, ...next }))}
+            agents={fieldAgents.map((row) => ({
+              id: row.id,
+              name: agentName(row.agent),
+            }))}
+            selectedAgentId={analyticsAgentId}
+            onAgentChange={setAnalyticsAgentId}
+            compareBy={compareBy}
+            compareOptions={surveyAnalytics?.compare_options || []}
+            onCompareByChange={setCompareBy}
+            analyticsLoading={analyticsLoading}
+            busy={exportBusy}
+            onGeneratePdf={() => void runPdfReport()}
+            onGenerateCsv={() => void runCsvExport()}
+          />
         </TabsContent>
       </Tabs>
     </div>

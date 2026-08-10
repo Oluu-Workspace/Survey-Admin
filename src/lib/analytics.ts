@@ -100,8 +100,8 @@ export function analyticsBundle(
   const byAgent: Record<string, { count: number; flagged: number }> = {};
 
   for (const r of responses) {
-    const ward = r.location?.ward || 'Unknown ward';
-    const village = r.location?.village || 'Unknown village';
+    const ward = r.location?.ward || 'Unknown Ward';
+    const village = r.location?.village || 'Unknown Village';
     if (!byAgent[r.agent_id]) byAgent[r.agent_id] = { count: 0, flagged: 0 };
     if (isExcluded(r)) {
       byAgent[r.agent_id].flagged += 1;
@@ -387,6 +387,10 @@ export function openPrintableReport(opts: {
     filterSummary,
   } = opts;
   void _analyticsFromApi;
+  const logoSrc =
+    typeof window !== 'undefined'
+      ? `${window.location.origin}/strategic-insight-logo.png`
+      : '/strategic-insight-logo.png';
   const reportBundle = { ...bundle, perQuestion: bundle.perQuestion };
   const barsByPct = (items: { option: string; count: number; pct: number }[]) => {
     const safe = items.length ? items : [];
@@ -672,9 +676,14 @@ export function openPrintableReport(opts: {
     })
     .filter(Boolean);
 
+  const isUnknownPlace = (k: string) => {
+    const n = k.trim().toLowerCase();
+    return !n || n === 'unknown ward' || n === 'unknown village' || n === 'unknown';
+  };
+
   const rankedTable = (record: Record<string, number>, title: string) => {
     const entries = Object.entries(record)
-      .filter(([k]) => k && k !== 'Unknown ward' && k !== 'Unknown village')
+      .filter(([k]) => k && !isUnknownPlace(k))
       .sort((a, b) => b[1] - a[1]);
     if (!entries.length) return `<p class="meta">No ${escapeHtml(title)} data</p>`;
     const total = entries.reduce((s, [, c]) => s + c, 0) || 1;
@@ -727,13 +736,13 @@ export function openPrintableReport(opts: {
   const agentTotal = bundle.byAgent.reduce((s, a) => s + a.count, 0) || 1;
 
   const wardDist = Object.entries(bundle.byWard)
-    .filter(([k]) => k && k !== 'Unknown ward')
+    .filter(([k]) => k && !isUnknownPlace(k))
     .map(([option, count]) => {
       const total = Object.values(bundle.byWard).reduce((s, c) => s + c, 0) || 1;
       return { option, count, pct: Math.round((count / total) * 100) };
     });
   const villageDist = Object.entries(bundle.byVillage)
-    .filter(([k]) => k && k !== 'Unknown village')
+    .filter(([k]) => k && !isUnknownPlace(k))
     .map(([option, count]) => {
       const total = Object.values(bundle.byVillage).reduce((s, c) => s + c, 0) || 1;
       return { option, count, pct: Math.round((count / total) * 100) };
@@ -808,6 +817,10 @@ export function openPrintableReport(opts: {
         <h1>${reportTitle}</h1>
         ${surveySubtitle ? `<p class="sub">${escapeHtml(surveySubtitle)}</p>` : ''}
         <div class="meta">${reportArea} · Generated ${reportDate}</div>
+        <div class="tagline powered-by">
+          <span>Powered by</span>
+          <img src="${logoSrc}" alt="Strategic Insight" class="powered-logo" />
+        </div>
       </header>
       ${fetchedNote}
       ${filterNote}
@@ -914,7 +927,11 @@ export function openPrintableReport(opts: {
       </div>
       <div class="page-body">${p.body}</div>
       <footer class="page-footer">
-        <span>Tafiti research report · ${reportArea}</span>
+        <span class="powered-by-inline">
+          Tafiti · Powered by
+          <img src="${logoSrc}" alt="Strategic Insight" class="powered-logo-sm" />
+          · ${reportArea}
+        </span>
         <span>${reportDate}</span>
         <span class="mono">Page ${i + 1} / ${totalPages}</span>
       </footer>
@@ -962,6 +979,10 @@ export function openPrintableReport(opts: {
   .cover h1 { font-family: "Instrument Sans", sans-serif; font-size: 24px; margin: 0 0 6px; font-weight: 700; }
   .cover .sub { opacity: 0.92; font-size: 12px; max-width: 70em; }
   .cover .meta { color: rgba(255,255,255,0.85); font-size: 11px; margin-top: 10px; }
+  .cover .tagline.powered-by { margin-top: 12px; display: flex; align-items: center; gap: 8px; font-size: 11px; opacity: 0.95; }
+  .cover .powered-logo { height: 28px; width: auto; max-width: 160px; object-fit: contain; background: #000; padding: 4px 8px; border-radius: 2px; }
+  .powered-by-inline { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .powered-logo-sm { height: 16px; width: auto; max-width: 100px; object-fit: contain; background: #000; padding: 2px 4px; vertical-align: middle; }
   .brand { font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; opacity: 0.8; margin-bottom: 8px; }
   h2 { font-family: "Instrument Sans", sans-serif; font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; margin: 12px 0 6px; border-bottom: 2px solid #1B4D3E; padding-bottom: 3px; color: #1B4D3E; }
   h2:first-child { margin-top: 0; }
@@ -1062,15 +1083,28 @@ export function exportResponsesCsv(
     ...questions.map((q) => `${q.id} | ${String(q.label).replace(/[|,\n\r]/g, ' ')}`),
   ];
   const rows = responses.map((r, i) => {
+    const answers = r.answers || {};
+    const wardRaw = r.location?.ward || '';
+    const villageRaw = r.location?.village || '';
+    const wardUnknown = !wardRaw || /^unknown/i.test(wardRaw);
+    const villageUnknown = !villageRaw || /^unknown/i.test(villageRaw);
+    const ward =
+      (!wardUnknown && wardRaw) ||
+      String(answers.lari_ward ?? answers.ward ?? '') ||
+      wardRaw;
+    const village =
+      (!villageUnknown && villageRaw) ||
+      String(answers.lari_village ?? answers.village ?? '') ||
+      villageRaw;
     const cells = [
       respondentCode(r, i),
       r.status || 'submitted',
       String(r.agent_id ?? ''),
-      r.location?.ward || '',
-      r.location?.village || '',
+      ward,
+      village,
       r.created_at || r.submitted_at || '',
       ...questions.map((q) => {
-        const v = r.answers?.[q.id];
+        const v = answers[q.id];
         if (Array.isArray(v)) return v.join('; ');
         return v == null ? '' : String(v);
       }),

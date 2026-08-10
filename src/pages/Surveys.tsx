@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Plus, Search, MoreHorizontal, Play, Pause, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { surveysAPI, responsesAPI } from '@/services/api';
+import { mapSurveyFromApi } from '@/domain/survey';
 import { Stamp } from '@/components/Stamp';
 import { TablePagination } from '@/components/TablePagination';
 import { normalizeQuestions } from '@/lib/questions';
@@ -72,10 +73,27 @@ const Surveys = () => {
         surveysAPI.getAll({ limit: 100 }),
         responsesAPI.getAll({ limit: 500 }),
       ]);
-      setSurveys(surveysRes.surveys || surveysRes || []);
+      const rawList = surveysRes.surveys || surveysRes || [];
+      setSurveys(
+        (Array.isArray(rawList) ? rawList : []).map((raw: Record<string, unknown>) => {
+          const mapped = mapSurveyFromApi(raw);
+          return {
+            ...mapped,
+            assigned_agents_count:
+              (raw.assigned_agents_count as number | undefined) ?? mapped.assigned_agents.length,
+          };
+        }),
+      );
       const map: Record<string, number> = {};
       for (const r of responsesRes.responses || responsesRes || []) {
         if (r.survey_id) map[r.survey_id] = (map[r.survey_id] || 0) + 1;
+      }
+      // Prefer API survey stats when present so totals aren't capped by the 500-row sample.
+      for (const s of Array.isArray(rawList) ? rawList : []) {
+        const id = String((s as { id?: string }).id || '');
+        const n = (s as { response_count?: number; responses_count?: number }).response_count
+          ?? (s as { responses_count?: number }).responses_count;
+        if (id && typeof n === 'number') map[id] = n;
       }
       setCounts(map);
     } catch (err: any) {

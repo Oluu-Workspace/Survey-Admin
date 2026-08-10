@@ -3,6 +3,7 @@ import { useAuthStore } from '@/store/authStore';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { PoweredByStrategicInsight } from '@/components/PoweredByStrategicInsight';
 
 /** Primary research path: Home → Surveys → per-survey tabs (data, analysis, report). */
 const primaryNav = [
@@ -52,6 +53,9 @@ export function AppSidebar() {
       <div className="border-b border-border px-4 py-5">
         <div className="font-display text-sm font-semibold tracking-tight text-foreground">Tafiti Admin</div>
         <div className="mt-0.5 text-xs text-muted-foreground">Research &amp; field operations</div>
+        <p className="mt-2">
+          <PoweredByStrategicInsight />
+        </p>
         <p className="mt-2 text-[10px] leading-snug text-muted-foreground/80">
           Field agents use the <span className="font-medium text-foreground">Tafiti</span> mobile PWA — not this
           site.
@@ -113,6 +117,9 @@ export function PageChrome({ children }: { children: React.ReactNode }) {
           <h1 className="font-display text-sm font-semibold tracking-tight text-foreground">{title}</h1>
         </header>
         <main className="flex-1 overflow-auto p-4 md:p-5 lg:p-6">{children}</main>
+        <footer className="border-t border-border px-6 py-2">
+          <PoweredByStrategicInsight />
+        </footer>
       </div>
     </div>
   );

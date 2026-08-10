@@ -95,7 +95,7 @@ export async function buildFullResearchReportData(
     answer_value?: string;
   },
 ) {
-  const rowsPromise = fetchAllSurveyResponses(surveyId);
+  const rowsPromise = fetchAllSurveyResponses(surveyId, filters);
   let api: SurveyAnalyticsPayload | null = null;
   try {
     api = (await surveysAPI.getAnalytics(surveyId, {

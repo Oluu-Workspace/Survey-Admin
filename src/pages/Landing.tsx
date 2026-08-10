@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ArrowRight, CheckCircle2, Users, FileText, BarChart3, MapPin, Moon, Sun } from 'lucide-react';
+import { PoweredByStrategicInsight } from '@/components/PoweredByStrategicInsight';
 import { useTheme } from '@/hooks/use-theme';
 
 const Landing = () => {
@@ -47,9 +48,9 @@ const Landing = () => {
       {/* Hero Section */}
       <section className="py-20 px-4">
         <div className="container mx-auto text-center max-w-4xl">
-          <div className="mb-8 inline-flex items-center gap-2 rounded-full border border-border bg-muted px-4 py-2 text-sm text-muted-foreground">
-            <CheckCircle2 className="h-4 w-4 text-accent" />
-            <span>Powered by Tafiti • Survey Research Platform</span>
+          <div className="mb-8 inline-flex items-center gap-3 rounded-full border border-border bg-muted px-4 py-2 text-sm text-muted-foreground">
+            <CheckCircle2 className="h-4 w-4 shrink-0 text-accent" />
+            <PoweredByStrategicInsight />
           </div>
 
           <h1 className="mb-6 text-balance text-5xl font-bold tracking-tight text-foreground sm:text-6xl lg:text-7xl">
@@ -180,14 +181,17 @@ const Landing = () => {
       {/* Footer */}
       <footer className="border-t border-border py-8 px-4">
         <div className="container mx-auto text-center">
-          <div className="flex items-center justify-center gap-3 mb-4">
-            <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-              <MapPin className="w-4 h-4 text-primary-foreground" />
+          <div className="flex flex-col items-center justify-center gap-3 mb-4">
+            <div className="flex items-center justify-center gap-3">
+              <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
+                <MapPin className="w-4 h-4 text-primary-foreground" />
+              </div>
+              <span className="font-semibold">Tafiti</span>
             </div>
-            <span className="font-semibold">Tafiti</span>
+            <PoweredByStrategicInsight size="md" />
           </div>
           <p className="text-sm text-muted-foreground">
-            Survey Research Platform for Kenya • Built for researchers, by researchers
+            Survey Research Platform for Kenya
           </p>
         </div>
       </footer>

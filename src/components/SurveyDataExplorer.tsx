@@ -14,6 +14,7 @@ import {
 import { responsesAPI, surveysAPI } from '@/services/api';
 import type { ResponseFacets } from '@/components/AnalyticsFilterBar';
 import type { SurveyResponse } from '@/domain';
+import { isUnknownLocationValue } from '@/domain/constants';
 import { LIFECYCLE_LABELS, LIFECYCLE_STAGES } from '@/domain/enums';
 import { exportResponsesCsv } from '@/domain/response';
 import { normalizeQuestions, type SurveyQuestion } from '@/domain/question';
@@ -450,12 +451,12 @@ export function SurveyDataExplorer({
         return r.location.subcounty;
       case 'ward': {
         const w = r.location.ward;
-        if (w && w !== 'Unknown Ward') return w;
+        if (w && !isUnknownLocationValue(w)) return w;
         return formatAnswerCell(r.answers?.lari_ward);
       }
       case 'village': {
         const v = r.location.village;
-        if (v && v !== 'Unknown Village') return v;
+        if (v && !isUnknownLocationValue(v)) return v;
         return formatAnswerCell(r.answers?.lari_village);
       }
       case 'agent':

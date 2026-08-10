@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { toast } from 'sonner';
 import { MapPin, Loader2, Settings, Moon, Sun } from 'lucide-react';
 import { ConnectionTest } from '@/components/ConnectionTest';
+import { PoweredByStrategicInsight } from '@/components/PoweredByStrategicInsight';
 import { useTheme } from '@/hooks/use-theme';
 
 const Login = () => {
@@ -63,6 +64,9 @@ const Login = () => {
             <CardDescription>
               Survey Research Platform for Kenya
             </CardDescription>
+            <div className="flex justify-center pt-1">
+              <PoweredByStrategicInsight size="md" />
+            </div>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">

@@ -1,9 +1,18 @@
 import type { SurveyResponse } from '@/domain';
+import { isUnknownLocationValue } from '@/domain/constants';
 import { LIFECYCLE_LABELS } from '@/domain/enums';
 import { normalizeQuestions } from '@/domain/question';
 import { Stamp } from '@/components/Stamp';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
+
+function answerText(answers: Record<string, unknown>, ...keys: string[]): string {
+  for (const key of keys) {
+    const v = answers[key];
+    if (v != null && String(v).trim() !== '') return String(v);
+  }
+  return '';
+}
 
 type Props = {
   response: SurveyResponse;
@@ -41,14 +50,30 @@ export function ResponseDetailPanel({
         <div className="mt-2 grid grid-cols-2 gap-2 text-xs text-muted-foreground">
           <div>
             <span className="text-foreground">{r.respondent.name || '—'}</span>
-            <div>{r.respondent.phone_number || 'No phone'}</div>
+            <div>
+              {r.respondent.phone_number ||
+                answerText(r.answers, 'lari_mobile', 'pd_phone', 'phone') ||
+                'No phone'}
+            </div>
           </div>
           <div>
-            {r.respondent.gender || '—'} · {r.respondent.age ?? '—'}
+            {r.respondent.gender ||
+              answerText(r.answers, 'lari_gender', 'pd_gender', 'gender') ||
+              '—'}{' '}
+            ·{' '}
+            {(r.respondent.age ??
+              answerText(r.answers, 'lari_age', 'pd_age', 'age')) ||
+              '—'}
           </div>
           <div className="col-span-2">
-            {r.location.county} → {r.location.subcounty} → {r.location.ward} →{' '}
-            {r.location.village}
+            {r.location.county} → {r.location.subcounty} →{' '}
+            {!isUnknownLocationValue(r.location.ward)
+              ? r.location.ward
+              : answerText(r.answers, 'lari_ward', 'ward') || r.location.ward}{' '}
+            →{' '}
+            {!isUnknownLocationValue(r.location.village)
+              ? r.location.village
+              : answerText(r.answers, 'lari_village', 'village') || r.location.village}
           </div>
           <div>Agent: {r.agent_name || r.agent_id}</div>
           <div>Quality: {r.quality_score}%</div>
