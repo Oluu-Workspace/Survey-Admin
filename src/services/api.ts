@@ -327,6 +327,32 @@ export const operationsAPI = {
   },
 };
 
+export type CollectionHoursSettings = {
+  timezone: string;
+  start: string;
+  end: string;
+  after_hours_open: boolean;
+  after_hours_until?: string | null;
+  effective_open?: boolean;
+  updated_at?: string | null;
+  updated_by?: string | null;
+};
+
+export const settingsAPI = {
+  getCollectionHours: async (): Promise<CollectionHoursSettings> => {
+    const { data } = await api.get('/settings/collection-hours');
+    return data.collection_hours;
+  },
+  updateCollectionHours: async (payload: {
+    after_hours_open?: boolean;
+    after_hours_until?: string | null;
+    clear_until?: boolean;
+  }): Promise<CollectionHoursSettings> => {
+    const { data } = await api.put('/settings/collection-hours', payload);
+    return data.collection_hours;
+  },
+};
+
 export const dashboardAPI = {
   getStats: async (): Promise<DashboardStats> => {
     const { data } = await api.get('/analytics/dashboard');

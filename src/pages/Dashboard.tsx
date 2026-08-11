@@ -4,6 +4,7 @@ import { toast } from 'sonner';
 import { operationsAPI } from '@/services/api';
 import type { SurveyResponse } from '@/domain';
 import { Stamp } from '@/components/Stamp';
+import { CollectionHoursAdminCard } from '@/components/CollectionHoursAdminCard';
 import { LIFECYCLE_LABELS } from '@/domain/enums';
 import { Button } from '@/components/ui/button';
 
@@ -99,6 +100,8 @@ const Dashboard = () => {
           <Link to="/dashboard/surveys">All surveys</Link>
         </Button>
       </div>
+
+      <CollectionHoursAdminCard />
 
       <section className="space-y-3">
         <h3 className="font-display text-xs uppercase tracking-wide text-muted-foreground">
