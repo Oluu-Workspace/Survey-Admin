@@ -29,6 +29,7 @@ interface Agent {
   county?: string;
   subcounty?: string;
   surveys_completed?: number;
+  has_login?: boolean;
 }
 
 type SurveyAssignRow = {
@@ -61,17 +62,22 @@ const Agents = () => {
   const [loading, setLoading] = useState(true);
   const [form, setForm] = useState(emptyForm);
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+  const [pageSize, setPageSize] = useState(50);
+  const [accountTotal, setAccountTotal] = useState(0);
   const [assignments, setAssignments] = useState<SurveyAssignRow[]>([]);
   const [assignBusy, setAssignBusy] = useState(false);
 
   const load = async () => {
     setLoading(true);
     try {
-      const data = await agentsAPI.getAll({ limit: 200 });
+      const data = await agentsAPI.getAll({ limit: 500, per_page: 500 });
       const list = (data.agents || data || []) as Agent[];
+      setAccountTotal(Number(data?.pagination?.total) || list.length);
       // Field agents only on this page (staff live under Users)
-      setAgents(list.filter((a) => (a.role || 'agent') === 'agent' || !a.role));
+      setAgents(list.filter((a) => {
+        const role = (a.role || 'agent').toLowerCase();
+        return role === 'agent';
+      }));
     } catch {
       toast.error('Could not load agents');
       setAgents([]);
@@ -124,7 +130,7 @@ const Agents = () => {
     try {
       if (next === 'active') await agentsAPI.activate(id);
       else await agentsAPI.deactivate(id);
-      toast.success(next === 'active' ? 'Agent can sign in' : 'Agent sign-in blocked');
+      toast.success(next === 'active' ? 'Agent unsuspended — can sign in' : 'Agent suspended — cannot sign in');
       await load();
     } catch {
       toast.error('Update failed');
@@ -163,7 +169,7 @@ const Agents = () => {
         ...form,
         first_name: form.first_name.trim(),
         last_name: form.last_name.trim(),
-        email: form.email.trim(),
+        email: form.email.trim().toLowerCase(),
         status: 'active',
         role: 'agent',
       });
@@ -262,6 +268,9 @@ const Agents = () => {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <p className="text-sm text-muted-foreground">
             {filtered.length} field agent{filtered.length === 1 ? '' : 's'}
+            {accountTotal > filtered.length
+              ? ` · ${accountTotal} accounts total (admins/managers are under Users)`
+              : ''}
             {statusFilter !== 'all' ? ` · ${statusFilter}` : ''}
           </p>
           <Button
@@ -315,6 +324,7 @@ const Agents = () => {
                   <th className="hidden sm:table-cell">Email</th>
                   <th className="hidden md:table-cell">Ward / Village</th>
                   <th>Status</th>
+                  <th className="hidden lg:table-cell">Login</th>
                 </tr>
               </thead>
               <tbody>
@@ -335,12 +345,21 @@ const Agents = () => {
                       <td className="font-display font-medium">
                         {agent.first_name} {agent.last_name}
                       </td>
-                      <td className="hidden text-muted-foreground sm:table-cell">{agent.email}</td>
+                      <td className="hidden text-muted-foreground sm:table-cell">
+                        {(agent.email || '').toLowerCase()}
+                      </td>
                       <td className="hidden text-muted-foreground md:table-cell">
                         {[agent.ward, agent.village].filter(Boolean).join(' · ') || '—'}
                       </td>
                       <td>
                         <Stamp status={status} />
+                      </td>
+                      <td className="hidden lg:table-cell">
+                        {agent.has_login === false ? (
+                          <span className="text-xs font-medium text-destructive">No password</span>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">OK</span>
+                        )}
                       </td>
                     </tr>
                   );
@@ -403,7 +422,14 @@ const Agents = () => {
                     type={key === 'password' ? 'password' : key === 'email' ? 'email' : 'text'}
                     className="rounded-sm"
                     value={form[key]}
-                    onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
+                    autoCapitalize={key === 'email' ? 'none' : undefined}
+                    autoCorrect={key === 'email' ? 'off' : undefined}
+                    onChange={(e) =>
+                      setForm((f) => ({
+                        ...f,
+                        [key]: key === 'email' ? e.target.value.toLowerCase() : e.target.value,
+                      }))
+                    }
                   />
                 </div>
               ))}
@@ -498,6 +524,11 @@ const Agents = () => {
               </div>
 
               <div className="space-y-3 border-t border-border pt-4">
+                {selected.has_login === false ? (
+                  <p className="rounded-sm border border-destructive/40 bg-destructive/5 px-3 py-2 text-xs text-destructive">
+                    This agent has no saved login password. Set one below so they can sign in.
+                  </p>
+                ) : null}
                 <div className="space-y-1.5">
                   <Label className="font-display text-xs uppercase tracking-wide">
                     Reset password
@@ -530,7 +561,7 @@ const Agents = () => {
                     className="w-full rounded-sm"
                     onClick={() => void setStatus(selected.id, 'active')}
                   >
-                    Let them sign in
+                    Unsuspend agent
                   </Button>
                 ) : (
                   <Button
@@ -538,7 +569,7 @@ const Agents = () => {
                     className="w-full rounded-sm"
                     onClick={() => void setStatus(selected.id, 'suspended')}
                   >
-                    Block sign-in
+                    Suspend agent
                   </Button>
                 )}
                 <Button

@@ -32,6 +32,14 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { SURVEY_STATUS_LABELS, SURVEY_STATUSES } from '@/domain/enums';
 
 type Agent = {
   id: string;
@@ -269,12 +277,14 @@ const SurveyDetail = () => {
 
   const setSurveyStatus = async (status: string) => {
     if (status === 'active' && questions.length === 0) {
-      toast.error('Add at least one question before activating');
+      toast.error('Add at least one question before starting collection');
       return;
     }
     try {
       await surveysAPI.update(surveyId, { status });
-      toast.success(status === 'active' ? 'Survey is open for collection' : 'Collection blocked');
+      const label =
+        SURVEY_STATUS_LABELS[status as keyof typeof SURVEY_STATUS_LABELS] || status;
+      toast.success(`Survey marked ${label.toLowerCase()}`);
       await load();
     } catch (err: any) {
       toast.error(err?.response?.data?.error || 'Update failed');
@@ -364,7 +374,8 @@ const SurveyDetail = () => {
         surveyTitle: survey.title || 'Survey',
         surveySubtitle: survey.description || undefined,
         area: [survey.ward, survey.village, survey.county].filter(Boolean).join(' · ') || 'All areas',
-        generatedAt: new Date().toLocaleString(undefined, {
+        generatedAt: new Date().toLocaleString('en-GB', {
+          timeZone: 'Africa/Nairobi',
           dateStyle: 'medium',
           timeStyle: 'short',
         }),
@@ -510,21 +521,29 @@ const SurveyDetail = () => {
             <span className="ledger-count">{questions.length}</span> questions
           </p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          {survey.status !== 'active' ? (
-            <Button size="sm" className="rounded-sm" onClick={() => void setSurveyStatus('active')}>
-              Activate survey
-            </Button>
-          ) : (
-            <Button
-              size="sm"
-              variant="outline"
-              className="rounded-sm"
-              onClick={() => void setSurveyStatus('closed')}
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center gap-2">
+            <Label className="sr-only">Survey status</Label>
+            <Select
+              value={
+                SURVEY_STATUSES.includes(survey.status as (typeof SURVEY_STATUSES)[number])
+                  ? survey.status
+                  : 'draft'
+              }
+              onValueChange={(value) => void setSurveyStatus(value)}
             >
-              Block collection
-            </Button>
-          )}
+              <SelectTrigger className="h-9 w-[160px] rounded-sm">
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                {SURVEY_STATUSES.map((s) => (
+                  <SelectItem key={s} value={s}>
+                    {SURVEY_STATUS_LABELS[s]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
           <Button size="sm" variant="outline" className="rounded-sm" onClick={() => setTab('data')}>
             Browse data
           </Button>

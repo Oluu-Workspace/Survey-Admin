@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { AlertTriangle, Trash2, CheckCircle2, XCircle, Search, Filter } from 'lucide-react';
 import { toast } from 'sonner';
+import { formatDateTimeEAT } from '@/lib/datetime';
 
 export interface DuplicateGroup {
   id: string;
@@ -569,7 +570,7 @@ const DuplicateDetection = ({ responses, onResponseUpdate }: DuplicateDetectionP
                             Agent: {response.agent_name} • {response.county}, {response.ward}
                           </div>
                           <div className="text-xs text-muted-foreground">
-                            {new Date(response.created_at).toLocaleString()}
+                            {formatDateTimeEAT(response.created_at)}
                           </div>
                         </div>
                         <div className="text-xs text-muted-foreground">

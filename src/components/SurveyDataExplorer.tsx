@@ -11,12 +11,13 @@ import {
   Save,
   Search,
 } from 'lucide-react';
-import { responsesAPI, surveysAPI } from '@/services/api';
+import { responsesAPI, surveysAPI, agentQueriesAPI } from '@/services/api';
 import type { ResponseFacets } from '@/components/AnalyticsFilterBar';
 import type { SurveyResponse } from '@/domain';
 import { isUnknownLocationValue } from '@/domain/constants';
 import { LIFECYCLE_LABELS, LIFECYCLE_STAGES } from '@/domain/enums';
 import { exportResponsesCsv } from '@/domain/response';
+import { formatDateTimeEAT, todayEAT } from '@/lib/datetime';
 import { normalizeQuestions, type SurveyQuestion } from '@/domain/question';
 import { exportResponsesCsv as exportWithAnswers } from '@/lib/analytics';
 import { ResponseDetailPanel } from '@/components/ResponseDetailPanel';
@@ -85,7 +86,7 @@ const META_COLUMNS: { key: MetaColumnKey; label: string }[] = [
   { key: 'quality', label: 'Quality' },
 ];
 
-const DEFAULT_META_VISIBLE: MetaColumnKey[] = ['agent', 'submitted'];
+const DEFAULT_META_VISIBLE: MetaColumnKey[] = ['agent', 'submitted', 'quality'];
 
 function questionColumnKey(questionId: string): ColumnKey {
   return `q:${questionId}`;
@@ -239,6 +240,82 @@ export function SurveyDataExplorer({
     return () => clearTimeout(t);
   }, [search]);
 
+  useEffect(() => {
+    setPagination((p) => (p.page === 1 ? p : { ...p, page: 1 }));
+  }, [
+    debouncedSearch,
+    lifecycle,
+    status,
+    agentFilter,
+    county,
+    ward,
+    answerQuestionId,
+    answerValue,
+    sortBy,
+    sortOrder,
+    surveyId,
+  ]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const run = async () => {
+      if (!surveyId) return;
+      setLoading(true);
+      try {
+        const res = await responsesAPI.getAll({
+          page: pagination.page,
+          per_page: pagination.per_page,
+          search: debouncedSearch || undefined,
+          lifecycle_stage: lifecycle !== 'all' ? lifecycle : undefined,
+          status: status !== 'all' ? status : undefined,
+          survey_id: surveyId,
+          agent_id: agentFilter || undefined,
+          county: county || undefined,
+          ward: ward || undefined,
+          answer_question_id: answerQuestionId || undefined,
+          answer_value: answerValue || undefined,
+          sort_by: sortBy,
+          sort_order: sortOrder,
+        });
+        if (cancelled) return;
+        setRows(res.responses);
+        // Only sync totals — keep the page the user selected so a slow/stale
+        // response cannot jump the table back a page.
+        setPagination((p) => ({
+          ...p,
+          total: Number(res.pagination?.total ?? 0),
+          pages: Math.max(1, Number(res.pagination?.pages ?? 1)),
+          per_page: Number(res.pagination?.per_page ?? p.per_page),
+        }));
+      } catch {
+        if (!cancelled) {
+          toast.error('Could not load survey responses');
+          setRows([]);
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+    void run();
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    surveyId,
+    pagination.page,
+    pagination.per_page,
+    debouncedSearch,
+    lifecycle,
+    status,
+    agentFilter,
+    county,
+    ward,
+    answerQuestionId,
+    answerValue,
+    sortBy,
+    sortOrder,
+  ]);
+
   const fetchData = useCallback(async () => {
     if (!surveyId) return;
     setLoading(true);
@@ -259,7 +336,12 @@ export function SurveyDataExplorer({
         sort_order: sortOrder,
       });
       setRows(res.responses);
-      setPagination((p) => ({ ...p, ...res.pagination }));
+      setPagination((p) => ({
+        ...p,
+        total: Number(res.pagination?.total ?? 0),
+        pages: Math.max(1, Number(res.pagination?.pages ?? 1)),
+        per_page: Number(res.pagination?.per_page ?? p.per_page),
+      }));
     } catch {
       toast.error('Could not load survey responses');
       setRows([]);
@@ -283,12 +365,12 @@ export function SurveyDataExplorer({
   ]);
 
   useEffect(() => {
-    void fetchData();
-  }, [fetchData]);
-
-  useEffect(() => {
-    setPagination((p) => ({ ...p, page: 1 }));
-  }, [debouncedSearch, lifecycle, status, agentFilter, county, ward, answerQuestionId, answerValue, sortBy, sortOrder, surveyId]);
+    setPagination((p) => {
+      const maxPage = Math.max(1, p.pages || 1);
+      if (p.page <= maxPage) return p;
+      return { ...p, page: maxPage };
+    });
+  }, [pagination.pages]);
 
   const selected = rows.find((r) => r.id === selectedId) ?? null;
 
@@ -404,7 +486,7 @@ export function SurveyDataExplorer({
       toast.error('Select rows to export');
       return;
     }
-    const name = `${surveyTitle || 'survey'}-${new Date().toISOString().slice(0, 10)}.csv`;
+    const name = `${surveyTitle || 'survey'}-${todayEAT()}.csv`;
     if (questions.length) {
       exportWithAnswers(surveyTitle || 'survey', questions, toExport as never);
     } else {
@@ -416,8 +498,22 @@ export function SurveyDataExplorer({
     if (isQuestionColumn(key)) {
       const qid = questionIdFromColumn(key);
       const text = formatAnswerCell(r.answers?.[qid]);
+      const flags = r.quality_flags || [];
+      const suspicious =
+        flags.includes(`self_name:${qid}`) ||
+        flags.includes(`garbage:${qid}`) ||
+        (qid === 'lari_mobile' && flags.includes('fake_phone'));
       return (
-        <span className="block max-w-[220px] truncate" title={text === '—' ? undefined : text}>
+        <span
+          className={`block max-w-[220px] truncate ${suspicious ? 'font-medium text-destructive' : ''}`}
+          title={
+            suspicious
+              ? `${text} — flagged (${flags.filter((f) => f.includes(qid) || f === 'fake_phone').join(', ')})`
+              : text === '—'
+                ? undefined
+                : text
+          }
+        >
           {text}
         </span>
       );
@@ -462,7 +558,7 @@ export function SurveyDataExplorer({
       case 'agent':
         return r.agent_name || r.agent_id.slice(0, 8);
       case 'submitted':
-        return r.submitted_at ? new Date(r.submitted_at).toLocaleString() : '—';
+        return formatDateTimeEAT(r.submitted_at);
       case 'duration':
         return r.metadata.duration_seconds != null
           ? `${Math.round(Number(r.metadata.duration_seconds) / 60)}m`
@@ -471,8 +567,18 @@ export function SurveyDataExplorer({
         return <Stamp status={r.status} />;
       case 'lifecycle':
         return <Stamp status={r.lifecycle_stage} label={LIFECYCLE_LABELS[r.lifecycle_stage]} />;
-      case 'quality':
-        return `${r.quality_score}%`;
+      case 'quality': {
+        const flags = r.quality_flags || [];
+        const low = r.quality_score < 70 || flags.length > 0;
+        return (
+          <span
+            className={low ? 'font-medium text-destructive' : ''}
+            title={flags.length ? flags.join(', ') : undefined}
+          >
+            {r.quality_score}%{flags.length ? ' ⚠' : ''}
+          </span>
+        );
+      }
       default:
         return '—';
     }
@@ -736,7 +842,7 @@ export function SurveyDataExplorer({
                     <table className="ledger-table w-full min-w-max">
                       <thead className="sticky top-0 z-[5] bg-card shadow-sm">
                         <tr>
-                          <th className="w-10">
+                          <th className="sticky left-0 z-[6] w-10 bg-card">
                             <span className="sr-only">Select</span>
                           </th>
                           {activeColumns.map((c) => {
@@ -772,7 +878,10 @@ export function SurveyDataExplorer({
                             className={`cursor-pointer ${selectedId === r.id ? 'bg-primary/5' : ''}`}
                             onClick={() => setSelectedId(r.id)}
                           >
-                            <td onClick={(e) => e.stopPropagation()}>
+                            <td
+                              className="sticky left-0 z-[4] bg-card"
+                              onClick={(e) => e.stopPropagation()}
+                            >
                               <Checkbox
                                 checked={selectedIds.has(r.id)}
                                 onCheckedChange={() => toggleRow(r.id)}
@@ -829,6 +938,29 @@ export function SurveyDataExplorer({
                     validation_notes: notes,
                   })
                 }
+                onQueryAgent={async (message) => {
+                  setActionBusy(true);
+                  try {
+                    const reason =
+                      (selected.quality_flags || [])[0]?.split(':')[0] || 'quality';
+                    await agentQueriesAPI.create({
+                      message,
+                      response_id: selected.id,
+                      agent_id: selected.agent_id,
+                      survey_id: selected.survey_id,
+                      reason,
+                      flag_response: true,
+                    });
+                    toast.success('Agent queried — interview flagged');
+                    await fetchData();
+                    onResponsesChange?.();
+                  } catch (err: any) {
+                    toast.error(err?.response?.data?.error || 'Could not query agent');
+                    throw err;
+                  } finally {
+                    setActionBusy(false);
+                  }
+                }}
               />
             </div>
           ) : null}

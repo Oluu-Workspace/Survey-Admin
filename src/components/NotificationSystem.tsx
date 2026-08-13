@@ -13,6 +13,7 @@ import {
   Info, XCircle, Clock, Users, BarChart3, MapPin, Download, Zap
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { formatDateTimeEAT } from '@/lib/datetime';
 
 export interface Notification {
   id: string;
@@ -340,7 +341,7 @@ const NotificationSystem = ({ userId }: NotificationSystemProps) => {
                         <div className="flex items-center gap-4 text-xs text-muted-foreground">
                           <span className="flex items-center gap-1">
                             <Clock className="h-3 w-3" />
-                            {new Date(notification.timestamp).toLocaleString()}
+                            {formatDateTimeEAT(notification.timestamp)}
                           </span>
                           {notification.metadata && (
                             <span className="flex items-center gap-1">

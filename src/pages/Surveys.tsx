@@ -1,9 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Plus, Search, MoreHorizontal, Play, Pause, Trash2 } from 'lucide-react';
-import { toast } from 'sonner';
 import { surveysAPI, responsesAPI } from '@/services/api';
 import { mapSurveyFromApi } from '@/domain/survey';
+import { SURVEY_STATUS_LABELS, SURVEY_STATUSES } from '@/domain/enums';
 import { Stamp } from '@/components/Stamp';
 import { TablePagination } from '@/components/TablePagination';
 import { normalizeQuestions } from '@/lib/questions';
@@ -33,7 +30,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-
+import { CheckCircle2, CircleDashed, Ban, Play, Trash2, Plus, Search, MoreHorizontal } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
 type SurveyRecord = {
   id: string;
   title: string;
@@ -70,8 +70,8 @@ const Surveys = () => {
     setLoading(true);
     try {
       const [surveysRes, responsesRes] = await Promise.all([
-        surveysAPI.getAll({ limit: 100 }),
-        responsesAPI.getAll({ limit: 500 }),
+        surveysAPI.getAll({ per_page: 500 }),
+        responsesAPI.getAll({ per_page: 500 }),
       ]);
       const rawList = surveysRes.surveys || surveysRes || [];
       setSurveys(
@@ -166,12 +166,14 @@ const Surveys = () => {
   const setStatus = async (survey: SurveyRecord, status: string) => {
     const qCount = normalizeQuestions(survey.questions).length;
     if (status === 'active' && qCount === 0) {
-      toast.error('Add at least one question before activating');
+      toast.error('Add at least one question before starting collection');
       return;
     }
     try {
       await surveysAPI.update(survey.id, { status });
-      toast.success(status === 'active' ? 'Survey is open for collection' : 'Survey closed');
+      const label =
+        SURVEY_STATUS_LABELS[status as keyof typeof SURVEY_STATUS_LABELS] || status;
+      toast.success(`Survey marked ${label.toLowerCase()}`);
       await load();
     } catch (err: any) {
       toast.error(err?.response?.data?.error || 'Update failed');
@@ -289,14 +291,16 @@ const Surveys = () => {
           />
         </div>
         <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="h-9 w-[140px] rounded-sm">
+          <SelectTrigger className="h-9 w-[160px] rounded-sm">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All</SelectItem>
-            <SelectItem value="draft">Draft</SelectItem>
-            <SelectItem value="active">Active</SelectItem>
-            <SelectItem value="closed">Closed</SelectItem>
+            <SelectItem value="all">All statuses</SelectItem>
+            {SURVEY_STATUSES.map((s) => (
+              <SelectItem key={s} value={s}>
+                {SURVEY_STATUS_LABELS[s]}
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
       </div>
@@ -376,19 +380,33 @@ const Surveys = () => {
                             Data Explorer
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
+                          {survey.status !== 'draft' ? (
+                            <DropdownMenuItem onClick={() => void setStatus(survey, 'draft')}>
+                              <CircleDashed className="mr-2 h-4 w-4" />
+                              Mark not started
+                            </DropdownMenuItem>
+                          ) : null}
                           {survey.status !== 'active' ? (
                             <DropdownMenuItem
                               disabled={qCount === 0}
                               onClick={() => void setStatus(survey, 'active')}
                             >
                               <Play className="mr-2 h-4 w-4" />
-                              {qCount === 0 ? 'Activate (add questions first)' : 'Activate'}
+                              {qCount === 0 ? 'Start (add questions first)' : 'Mark ongoing'}
                             </DropdownMenuItem>
-                          ) : (
+                          ) : null}
+                          {survey.status !== 'completed' ? (
+                            <DropdownMenuItem onClick={() => void setStatus(survey, 'completed')}>
+                              <CheckCircle2 className="mr-2 h-4 w-4" />
+                              Mark complete
+                            </DropdownMenuItem>
+                          ) : null}
+                          {survey.status !== 'closed' ? (
                             <DropdownMenuItem onClick={() => void setStatus(survey, 'closed')}>
-                              <Pause className="mr-2 h-4 w-4" /> Close
+                              <Ban className="mr-2 h-4 w-4" />
+                              Mark closed
                             </DropdownMenuItem>
-                          )}
+                          ) : null}
                           <DropdownMenuItem
                             className="text-destructive focus:text-destructive"
                             onClick={() => void removeSurvey(survey)}

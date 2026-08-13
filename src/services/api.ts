@@ -40,7 +40,10 @@ api.interceptors.response.use(
 
 export const authAPI = {
   login: async (email: string, password: string): Promise<AuthResponse> => {
-    const { data } = await api.post('/auth/login', { email, password });
+    const { data } = await api.post('/auth/login', {
+      email: email.trim().toLowerCase(),
+      password,
+    });
     return data;
   },
   
@@ -90,8 +93,13 @@ export const projectsAPI = {
 };
 
 export const agentsAPI = {
-  getAll: async (params?: { page?: number; limit?: number; status?: string }) => {
-    const { data } = await api.get('/agents', { params });
+  getAll: async (params?: { page?: number; limit?: number; per_page?: number; status?: string }) => {
+    const { data } = await api.get('/agents', {
+      params: {
+        ...params,
+        per_page: params?.per_page ?? params?.limit ?? 500,
+      },
+    });
     return data;
   },
   
@@ -157,7 +165,7 @@ export const surveysAPI = {
     const { data } = await api.get('/surveys', {
       params: {
         ...params,
-        per_page: params?.per_page ?? params?.limit,
+        per_page: params?.per_page ?? params?.limit ?? 500,
       },
     });
     return data;
@@ -248,7 +256,7 @@ export const responsesAPI = {
     const { data } = await api.get('/responses', {
       params: {
         ...params,
-        per_page: params?.per_page ?? params?.limit,
+        per_page: params?.per_page ?? params?.limit ?? 50,
       },
     });
     const responses = (data.responses || []).map((r: Record<string, unknown>) =>
@@ -355,6 +363,71 @@ export const settingsAPI = {
   }): Promise<CollectionHoursSettings> => {
     const { data } = await api.put('/settings/collection-hours', payload);
     return data.collection_hours;
+  },
+};
+
+export type AgentQuery = {
+  id: string;
+  agent_id: string;
+  response_id?: string | null;
+  survey_id?: string | null;
+  message: string;
+  reason?: string;
+  status: 'open' | 'answered' | 'resolved' | string;
+  created_by?: string;
+  created_at?: string;
+  updated_at?: string;
+  agent_reply?: string | null;
+  replied_at?: string | null;
+  resolved_at?: string | null;
+  resolved_by?: string | null;
+  admin_note?: string | null;
+  flagged_response?: boolean;
+  agent_name?: string;
+  agent_email?: string;
+  survey_title?: string;
+};
+
+export const agentQueriesAPI = {
+  list: async (params?: {
+    status?: string;
+    agent_id?: string;
+    response_id?: string;
+    mine?: boolean;
+  }) => {
+    const { data } = await api.get('/agent-queries', {
+      params: {
+        ...params,
+        mine: params?.mine ? '1' : undefined,
+      },
+    });
+    return data as { queries: AgentQuery[]; open_count: number };
+  },
+  create: async (payload: {
+    message: string;
+    response_id?: string;
+    agent_id?: string;
+    survey_id?: string;
+    reason?: string;
+    flag_response?: boolean;
+  }) => {
+    const { data } = await api.post('/agent-queries', payload);
+    return data as { message: string; query: AgentQuery };
+  },
+  reply: async (id: string, reply: string) => {
+    const { data } = await api.post(`/agent-queries/${id}/reply`, { reply });
+    return data as { message: string; query: AgentQuery };
+  },
+  resolve: async (
+    id: string,
+    payload?: {
+      admin_note?: string;
+      approve_response?: boolean;
+      reject_response?: boolean;
+    },
+  ) => {
+    const { data } = await api.post(`/agent-queries/${id}/resolve`, payload || {});
+    return data as { message: string; query: AgentQuery };
   },
 };
 

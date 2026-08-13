@@ -1,12 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import { responsesAPI } from '@/services/api';
+import { responsesAPI, surveysAPI, agentQueriesAPI } from '@/services/api';
 import type { SurveyResponse } from '@/domain';
 import { ResponseDetailPanel } from '@/components/ResponseDetailPanel';
 import { Stamp } from '@/components/Stamp';
 import { LIFECYCLE_LABELS } from '@/domain/enums';
 import { normalizeQuestions } from '@/domain/question';
-import { surveysAPI } from '@/services/api';
 
 const ReviewWorkspace = () => {
   const [queue, setQueue] = useState<SurveyResponse[]>([]);
@@ -134,6 +133,27 @@ const ReviewWorkspace = () => {
                 onApprove={() => void act({ status: 'approved' })}
                 onFlag={() => void act({ status: 'flagged', flag: true })}
                 onReject={() => void act({ status: 'rejected', is_valid: false })}
+                onQueryAgent={async (message) => {
+                  setBusy(true);
+                  try {
+                    await agentQueriesAPI.create({
+                      message,
+                      response_id: current.id,
+                      agent_id: current.agent_id,
+                      survey_id: current.survey_id,
+                      reason: (current.quality_flags || [])[0]?.split(':')[0] || 'quality',
+                      flag_response: true,
+                    });
+                    toast.success('Agent queried — interview flagged');
+                    setNotes('');
+                    await load();
+                  } catch (err: any) {
+                    toast.error(err?.response?.data?.error || 'Could not query agent');
+                    throw err;
+                  } finally {
+                    setBusy(false);
+                  }
+                }}
               />
             ) : null}
           </div>

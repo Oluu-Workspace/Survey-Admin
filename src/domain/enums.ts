@@ -23,7 +23,16 @@ export type ResponseStatus = (typeof RESPONSE_STATUSES)[number];
 
 export const AGENT_STATUSES = ['active', 'inactive', 'pending'] as const;
 
-export const SURVEY_STATUSES = ['draft', 'active', 'completed', 'archived'] as const;
+export const SURVEY_STATUSES = ['draft', 'active', 'completed', 'closed'] as const;
+
+export type SurveyStatus = (typeof SURVEY_STATUSES)[number];
+
+export const SURVEY_STATUS_LABELS: Record<SurveyStatus, string> = {
+  draft: 'Not started',
+  active: 'Ongoing',
+  completed: 'Complete',
+  closed: 'Closed',
+};
 
 export const LIFECYCLE_LABELS: Record<LifecycleStage, string> = {
   draft: 'Draft',

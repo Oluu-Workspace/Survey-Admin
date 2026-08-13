@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Progress } from '@/components/ui/progress';
 import { Search, Eye, Download, Filter, MapPin, User, Calendar, CheckCircle2, AlertTriangle, XCircle } from 'lucide-react';
 import { toast } from 'sonner';
+import { formatDateTimeEAT } from '@/lib/datetime';
 
 export interface SurveyResponse {
   id: string;
@@ -444,11 +445,11 @@ const SurveyResponseViewer = ({ surveyId, surveyTitle, responses, onResponseUpda
                 </div>
                 <div>
                   <Label className="text-sm font-medium">Submitted</Label>
-                  <div className="mt-1">{new Date(selectedResponse.created_at).toLocaleString()}</div>
+                  <div className="mt-1">{formatDateTimeEAT(selectedResponse.created_at)}</div>
                 </div>
                 <div>
                   <Label className="text-sm font-medium">Last Updated</Label>
-                  <div className="mt-1">{new Date(selectedResponse.updated_at).toLocaleString()}</div>
+                  <div className="mt-1">{formatDateTimeEAT(selectedResponse.updated_at)}</div>
                 </div>
               </div>
 

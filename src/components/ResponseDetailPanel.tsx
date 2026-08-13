@@ -5,6 +5,9 @@ import { normalizeQuestions } from '@/domain/question';
 import { Stamp } from '@/components/Stamp';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
+import { formatDateTimeEAT } from '@/lib/datetime';
+import { useState } from 'react';
+import { Link } from 'react-router-dom';
 
 function answerText(answers: Record<string, unknown>, ...keys: string[]): string {
   for (const key of keys) {
@@ -22,6 +25,7 @@ type Props = {
   onApprove: () => void;
   onReject: () => void;
   onFlag: () => void;
+  onQueryAgent?: (message: string) => void | Promise<void>;
   busy?: boolean;
 };
 
@@ -33,9 +37,25 @@ export function ResponseDetailPanel({
   onApprove,
   onReject,
   onFlag,
+  onQueryAgent,
   busy,
 }: Props) {
   const duration = r.metadata.duration_seconds;
+  const [queryMode, setQueryMode] = useState(false);
+  const [queryText, setQueryText] = useState('');
+  const [queryBusy, setQueryBusy] = useState(false);
+
+  const sendQuery = async () => {
+    if (!onQueryAgent || queryText.trim().length < 5) return;
+    setQueryBusy(true);
+    try {
+      await onQueryAgent(queryText.trim());
+      setQueryText('');
+      setQueryMode(false);
+    } finally {
+      setQueryBusy(false);
+    }
+  };
 
   return (
     <div className="flex h-full flex-col border-l border-border bg-card">
@@ -79,7 +99,7 @@ export function ResponseDetailPanel({
           <div>Quality: {r.quality_score}%</div>
           <div>
             Submitted:{' '}
-            {r.submitted_at ? new Date(r.submitted_at).toLocaleString() : '—'}
+            {formatDateTimeEAT(r.submitted_at)}
           </div>
           <div>
             Duration: {duration != null ? `${Math.round(duration / 60)} min` : '—'}
@@ -118,7 +138,7 @@ export function ResponseDetailPanel({
               {r.review_history.map((ev, i) => (
                 <li key={i} className="rounded-sm border border-border bg-muted/30 px-2 py-1.5">
                   <div className="text-muted-foreground">
-                    {ev.by} · {ev.at ? new Date(ev.at).toLocaleString() : '—'}
+                    {ev.by} · {formatDateTimeEAT(ev.at)}
                   </div>
                   {ev.notes ? <div className="mt-1">{ev.notes}</div> : null}
                 </li>
@@ -154,6 +174,26 @@ export function ResponseDetailPanel({
           >
             Flag
           </Button>
+          {onQueryAgent ? (
+            <Button
+              size="sm"
+              variant="outline"
+              className="rounded-sm"
+              disabled={busy}
+              onClick={() => {
+                setQueryMode((v) => !v);
+                if (!queryText && (notes || r.quality_flags?.length)) {
+                  const flags = (r.quality_flags || []).join(', ');
+                  setQueryText(
+                    notes ||
+                      `Please explain this interview. Quality flags: ${flags || 'manual review'}.`,
+                  );
+                }
+              }}
+            >
+              Flag &amp; query agent
+            </Button>
+          ) : null}
           <Button
             size="sm"
             variant="destructive"
@@ -164,6 +204,43 @@ export function ResponseDetailPanel({
             Reject
           </Button>
         </div>
+        {queryMode && onQueryAgent ? (
+          <div className="space-y-2 rounded-sm border border-border bg-muted/30 p-3">
+            <p className="text-xs text-muted-foreground">
+              Flags this interview and sends a question to{' '}
+              <span className="font-medium text-foreground">{r.agent_name || 'the agent'}</span>.
+              They reply in the agent app. Track replies under{' '}
+              <Link to="/dashboard/queries" className="text-primary underline-offset-2 hover:underline">
+                Agent queries
+              </Link>
+              .
+            </p>
+            <Textarea
+              className="min-h-[88px] rounded-sm text-sm"
+              placeholder="What should the agent explain?"
+              value={queryText}
+              onChange={(e) => setQueryText(e.target.value)}
+            />
+            <div className="flex gap-2">
+              <Button
+                size="sm"
+                className="rounded-sm"
+                disabled={queryBusy || queryText.trim().length < 5}
+                onClick={() => void sendQuery()}
+              >
+                {queryBusy ? 'Sending…' : 'Send query'}
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="rounded-sm"
+                onClick={() => setQueryMode(false)}
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
+        ) : null}
       </div>
     </div>
   );

@@ -13,6 +13,7 @@ import { Progress } from '@/components/ui/progress';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Download, FileText, FileSpreadsheet, FileImage, Database, Filter, Calendar, Users, MapPin, BarChart3, CheckCircle2, AlertTriangle, Clock, Zap } from 'lucide-react';
 import { toast } from 'sonner';
+import { formatDateTimeEAT } from '@/lib/datetime';
 import { SurveyResponse, Question } from './SurveyResponseViewer';
 
 interface ExportJob {
@@ -487,7 +488,7 @@ const ExportManager = ({ surveyId, surveyTitle, responses, questions }: ExportMa
                           {job.type}
                         </Badge>
                         <span>•</span>
-                        <span>{new Date(job.created_at).toLocaleString()}</span>
+                        <span>{formatDateTimeEAT(job.created_at)}</span>
                         {job.file_size && (
                           <>
                             <span>•</span>

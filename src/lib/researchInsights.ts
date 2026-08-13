@@ -282,12 +282,20 @@ export function collectionPeriodFromResponses(rows: ResponseLike[]): string | un
   const dates = rows
     .map((r) => r.submitted_at || r.created_at)
     .filter(Boolean)
-    .map((d) => new Date(d as string))
+    .map((d) => {
+      const s = String(d).trim();
+      return new Date(/[zZ]|[+-]\d{2}:?\d{2}$/.test(s) ? s : `${s}Z`);
+    })
     .filter((d) => !Number.isNaN(d.getTime()));
   if (!dates.length) return undefined;
   dates.sort((a, b) => a.getTime() - b.getTime());
   const fmt = (d: Date) =>
-    d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+    d.toLocaleDateString('en-GB', {
+      timeZone: 'Africa/Nairobi',
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    });
   const lo = fmt(dates[0]);
   const hi = fmt(dates[dates.length - 1]);
   return lo === hi ? lo : `${lo} – ${hi}`;

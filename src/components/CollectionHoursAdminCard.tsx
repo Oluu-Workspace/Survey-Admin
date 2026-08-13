@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { settingsAPI, type CollectionHoursSettings } from '@/services/api';
 import { Button } from '@/components/ui/button';
+import { formatDateTimeEAT } from '@/lib/datetime';
 
 /** Admin control to open/close agent app outside 8:00–18:30 Kenya time. */
 export function CollectionHoursAdminCard() {
@@ -114,10 +115,10 @@ export function CollectionHoursAdminCard() {
                 {open ? 'After-hours OPEN' : 'Normal hours only'}
               </span>
               {hours.after_hours_until
-                ? ` · until ${new Date(hours.after_hours_until).toLocaleString()}`
+                ? ` · until ${formatDateTimeEAT(hours.after_hours_until)}`
                 : null}
               {hours.updated_at
-                ? ` · updated ${new Date(hours.updated_at).toLocaleString()}`
+                ? ` · updated ${formatDateTimeEAT(hours.updated_at)}`
                 : null}
             </p>
           ) : (

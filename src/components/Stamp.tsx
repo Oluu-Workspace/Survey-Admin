@@ -4,6 +4,7 @@ export type StampKind =
   | 'active'
   | 'draft'
   | 'closed'
+  | 'completed'
   | 'suspended'
   | 'pending'
   | 'waiting'
@@ -21,9 +22,13 @@ export type StampKind =
   | 'archived';
 
 const LABEL: Record<string, string> = {
-  active: 'Active',
-  draft: 'Draft',
+  active: 'Ongoing',
+  draft: 'Not started',
   closed: 'Closed',
+  completed: 'Complete',
+  complete: 'Complete',
+  not_started: 'Not started',
+  ongoing: 'Ongoing',
   suspended: 'Suspended',
   pending: 'Pending',
   waiting: 'Waiting',
@@ -40,13 +45,20 @@ const LABEL: Record<string, string> = {
   pending_sync: 'Pending sync',
   pending_review: 'Pending review',
   uploaded: 'Uploaded',
-  archived: 'Archived',
+  archived: 'Closed',
+  open: 'Ongoing',
+  answered: 'Answered',
+  resolved: 'Resolved',
 };
 
 const CLASS: Record<string, string> = {
   active: 'stamp-active',
   draft: 'stamp-draft',
   closed: 'stamp-closed',
+  completed: 'stamp-approved',
+  complete: 'stamp-approved',
+  not_started: 'stamp-draft',
+  ongoing: 'stamp-active',
   suspended: 'stamp-suspended',
   pending: 'stamp-pending',
   waiting: 'stamp-waiting',
@@ -64,6 +76,9 @@ const CLASS: Record<string, string> = {
   pending_review: 'stamp-waiting',
   uploaded: 'stamp-collecting',
   archived: 'stamp-closed',
+  open: 'stamp-active',
+  answered: 'stamp-collecting',
+  resolved: 'stamp-approved',
 };
 
 export function Stamp({

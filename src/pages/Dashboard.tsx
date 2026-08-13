@@ -7,6 +7,7 @@ import { Stamp } from '@/components/Stamp';
 import { CollectionHoursAdminCard } from '@/components/CollectionHoursAdminCard';
 import { LIFECYCLE_LABELS } from '@/domain/enums';
 import { Button } from '@/components/ui/button';
+import { formatDateTimeEAT } from '@/lib/datetime';
 
 type CountyRow = {
   county: string;
@@ -317,7 +318,7 @@ const Dashboard = () => {
               {ops.recent_activity.map((r) => (
                 <tr key={r.id}>
                   <td className="text-sm text-muted-foreground">
-                    {r.submitted_at ? new Date(r.submitted_at).toLocaleString() : '—'}
+                    {formatDateTimeEAT(r.submitted_at)}
                   </td>
                   <td>{r.respondent.name || '—'}</td>
                   <td>

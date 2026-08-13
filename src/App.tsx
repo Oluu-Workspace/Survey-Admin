@@ -9,6 +9,7 @@ import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import DataExplorer from "./pages/DataExplorer";
 import ReviewWorkspace from "./pages/ReviewWorkspace";
+import AgentQueries from "./pages/AgentQueries";
 import ProjectDetail from "./pages/ProjectDetail";
 import Projects from "./pages/Projects";
 import Agents from "./pages/Agents";
@@ -39,6 +40,7 @@ const App = () => (
               <Route index element={<Dashboard />} />
               <Route path="data" element={<DataExplorer />} />
               <Route path="review" element={<ReviewWorkspace />} />
+              <Route path="queries" element={<AgentQueries />} />
               <Route path="projects" element={<Projects />} />
               <Route path="projects/:projectId" element={<ProjectDetail />} />
               <Route path="agents" element={<Agents />} />

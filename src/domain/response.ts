@@ -49,6 +49,7 @@ export type SurveyResponse = {
   reviewed_at?: string;
   review_history: ReviewEvent[];
   quality_score: number;
+  quality_flags?: string[];
   survey_title?: string;
   project_title?: string;
   agent_name?: string;
@@ -96,6 +97,9 @@ export function mapResponseFromApi(raw: Record<string, unknown>): SurveyResponse
       ? (raw.review_history as ReviewEvent[])
       : [],
     quality_score: Number(raw.quality_score ?? 0),
+    quality_flags: Array.isArray(raw.quality_flags)
+      ? (raw.quality_flags as string[])
+      : [],
     survey_title: raw.survey_title as string | undefined,
     project_title: raw.project_title as string | undefined,
     agent_name: raw.agent_name as string | undefined,

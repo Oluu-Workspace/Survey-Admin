@@ -72,7 +72,7 @@ export default function Users() {
         ...form,
         first_name: form.first_name.trim(),
         last_name: form.last_name.trim(),
-        email: form.email.trim(),
+        email: form.email.trim().toLowerCase(),
         status: 'active',
       });
       toast.success('Admin user created');
@@ -178,7 +178,7 @@ export default function Users() {
                   <td className="font-display font-medium">
                     {u.first_name} {u.last_name}
                   </td>
-                  <td className="text-muted-foreground">{u.email}</td>
+                  <td className="text-muted-foreground">{(u.email || '').toLowerCase()}</td>
                   <td className="capitalize">{u.role}</td>
                   <td>
                     <Stamp status={u.status === 'inactive' ? 'suspended' : u.status} />
@@ -226,7 +226,14 @@ export default function Users() {
                     type={key === 'password' ? 'password' : key === 'email' ? 'email' : 'text'}
                     className="rounded-sm"
                     value={form[key]}
-                    onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
+                    autoCapitalize={key === 'email' ? 'none' : undefined}
+                    autoCorrect={key === 'email' ? 'off' : undefined}
+                    onChange={(e) =>
+                      setForm((f) => ({
+                        ...f,
+                        [key]: key === 'email' ? e.target.value.toLowerCase() : e.target.value,
+                      }))
+                    }
                   />
                 </div>
               ))}

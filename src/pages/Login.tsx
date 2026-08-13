@@ -77,7 +77,9 @@ const Login = () => {
                   type="email"
                   placeholder="you@example.com"
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  onChange={(e) => setEmail(e.target.value.toLowerCase())}
                   disabled={isLoading}
                   required
                 />
