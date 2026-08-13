@@ -21,13 +21,18 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// Handle token refresh
+// 401 on a protected call = session expired. Do not treat public settings 401/404 as logout.
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
-    if (error.response?.status === 401) {
+    const status = error.response?.status;
+    const url = String(error.config?.url || '');
+    const isPublicSettings = url.includes('/settings/collection-hours');
+    if (status === 401 && !isPublicSettings) {
       localStorage.removeItem('auth_token');
-      window.location.href = '/login';
+      if (!window.location.pathname.startsWith('/login')) {
+        window.location.href = '/login';
+      }
     }
     return Promise.reject(error);
   }
