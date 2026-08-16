@@ -4,6 +4,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { PoweredByStrategicInsight } from '@/components/PoweredByStrategicInsight';
+import { useConfirmAction } from '@/components/confirm-action';
 
 /** Primary research path: Home → Surveys → per-survey tabs (data, analysis, report). */
 const primaryNav = [
@@ -37,8 +38,17 @@ function pageTitle(pathname: string) {
 export function AppSidebar() {
   const { user, logout } = useAuthStore();
   const navigate = useNavigate();
+  const confirmAction = useConfirmAction();
 
   const signOut = async () => {
+    const ok = await confirmAction({
+      title: 'Sign out of Tafiti Admin?',
+      description: 'You will need to sign in again to manage surveys, agents, and reports.',
+      confirmLabel: 'Sign out',
+      tone: 'warning',
+      facts: user?.email ? [{ label: 'Account', value: user.email }] : undefined,
+    });
+    if (!ok) return;
     await logout();
     navigate('/login');
   };

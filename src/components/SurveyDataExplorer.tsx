@@ -24,6 +24,7 @@ import { normalizeQuestions, type SurveyQuestion } from '@/domain/question';
 import { exportResponsesCsv as exportWithAnswers } from '@/lib/analytics';
 import { ResponseDetailPanel } from '@/components/ResponseDetailPanel';
 import { Stamp } from '@/components/Stamp';
+import { useConfirmAction } from '@/components/confirm-action';
 import { TablePagination } from '@/components/TablePagination';
 import {
   EMPTY_SURVEY_LIST_FILTERS,
@@ -185,6 +186,7 @@ export function SurveyDataExplorer({
   variant = 'embedded',
   emptyState,
 }: SurveyDataExplorerProps) {
+  const confirmAction = useConfirmAction();
   const [rows, setRows] = useState<SurveyResponse[]>([]);
   const [pagination, setPagination] = useState({ page: 1, per_page: 25, total: 0, pages: 1 });
   const [loading, setLoading] = useState(true);
@@ -505,6 +507,25 @@ export function SurveyDataExplorer({
   };
 
   const runValidate = async (id: string, payload: Parameters<typeof responsesAPI.validate>[1]) => {
+    const action =
+      payload.status === 'rejected'
+        ? 'Reject'
+        : payload.status === 'flagged' || payload.flag
+          ? 'Flag'
+          : 'Approve';
+    const ok = await confirmAction({
+      title: `${action} this interview?`,
+      description:
+        action === 'Reject'
+          ? 'The interview will be marked invalid and excluded from approved reporting.'
+          : action === 'Flag'
+            ? 'The interview will be flagged for follow-up. It stays in the review queue.'
+            : 'The interview will be marked approved and counted in reports.',
+      confirmLabel: action,
+      tone: action === 'Reject' ? 'danger' : action === 'Flag' ? 'warning' : 'default',
+      facts: [{ label: 'Interview', value: id.slice(0, 8) }],
+    });
+    if (!ok) return;
     setActionBusy(true);
     try {
       await responsesAPI.validate(id, payload);
@@ -520,6 +541,14 @@ export function SurveyDataExplorer({
   };
 
   const bulkApprove = async () => {
+    const ok = await confirmAction({
+      title: `Approve ${selectedIds.size} interview${selectedIds.size === 1 ? '' : 's'}?`,
+      description: 'Approved interviews are included in reports. This can be hard to reverse in bulk.',
+      confirmLabel: `Approve ${selectedIds.size}`,
+      tone: 'warning',
+      facts: [{ label: 'Selected', value: String(selectedIds.size) }],
+    });
+    if (!ok) return;
     for (const id of selectedIds) {
       await responsesAPI.validate(id, { status: 'approved', validation_notes: notes });
     }

@@ -12,12 +12,14 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { formatDateTimeEAT, kenyaDateTimeToIso, todayEAT } from '@/lib/datetime';
+import { useConfirmAction } from '@/components/confirm-action';
 
 type Scope = 'all' | 'survey' | 'agent';
 type UntilMode = 'morning' | 'custom' | 'open';
 
 /** Admin control to extend agent-app hours globally, per questionnaire, or per agent. */
 export function CollectionHoursAdminCard() {
+  const confirmAction = useConfirmAction();
   const [hours, setHours] = useState<CollectionHoursSettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -89,6 +91,24 @@ export function CollectionHoursAdminCard() {
       toast.error('Choose a Kenya date and time');
       return;
     }
+    const untilText =
+      untilMode === 'morning'
+        ? 'until 8:00 AM Kenya time'
+        : untilMode === 'open'
+          ? 'until you close it'
+          : `until ${untilDate} ${untilTime} Kenya time`;
+    const ok = await confirmAction({
+      title: 'Extend collection time?',
+      description:
+        'Field agents will be able to collect interviews outside the normal 8:00 AM – 6:30 PM Kenya window for this scope.',
+      confirmLabel: 'Extend time',
+      tone: 'warning',
+      facts: [
+        { label: 'Who', value: scopeLabel },
+        { label: 'Until', value: untilText },
+      ],
+    });
+    if (!ok) return;
     setBusy(true);
     try {
       const survey = surveys.find((s) => s.id === surveyId);
@@ -103,12 +123,6 @@ export function CollectionHoursAdminCard() {
         agent_name: scope === 'agent' ? agent?.name : undefined,
       });
       setHours(data);
-      const untilText =
-        untilMode === 'morning'
-          ? 'until 8:00 AM Kenya time'
-          : untilMode === 'open'
-            ? 'until you close it'
-            : `until ${untilDate} ${untilTime} Kenya time`;
       toast.success(`Extended collection time for ${scopeLabel} ${untilText}`);
     } catch (err: unknown) {
       const msg =
@@ -122,6 +136,24 @@ export function CollectionHoursAdminCard() {
   };
 
   const revoke = async (id: string) => {
+    const ov = overrides.find((o) => o.id === id);
+    const who =
+      ov?.scope === 'all'
+        ? 'All agents & questionnaires'
+        : ov?.scope === 'survey'
+          ? `Questionnaire: ${ov.survey_title || ov.label || ov.survey_id}`
+          : `Agent: ${ov?.agent_name || ov?.label || ov?.agent_id || '—'}`;
+    const ok = await confirmAction({
+      title: 'Close this time extension?',
+      description: 'Collection will return to the normal 8:00 AM – 6:30 PM Kenya window for this scope.',
+      confirmLabel: 'Close extension',
+      tone: 'warning',
+      facts: [
+        { label: 'Scope', value: who },
+        { label: 'Until', value: ov?.until ? formatDateTimeEAT(ov.until) : 'Until closed' },
+      ],
+    });
+    if (!ok) return;
     setBusy(true);
     try {
       const data = await settingsAPI.revokeCollectionHoursOverride(id);
@@ -135,6 +167,14 @@ export function CollectionHoursAdminCard() {
   };
 
   const closeAllGlobal = async () => {
+    const ok = await confirmAction({
+      title: 'Close global after-hours?',
+      description:
+        'All agents will return to the normal 8:00 AM – 6:30 PM Kenya window, unless a questionnaire or agent extension is still listed below.',
+      confirmLabel: 'Close global after-hours',
+      tone: 'warning',
+    });
+    if (!ok) return;
     setBusy(true);
     try {
       const data = await settingsAPI.updateCollectionHours({

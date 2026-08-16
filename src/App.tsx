@@ -18,6 +18,7 @@ import Surveys from "./pages/Surveys";
 import SurveyDetail from "./pages/SurveyDetail";
 import NotFound from "./pages/NotFound";
 import { DashboardLayout } from "./components/layout/DashboardLayout";
+import { ConfirmActionProvider } from "./components/confirm-action";
 
 const queryClient = new QueryClient();
 
@@ -25,32 +26,34 @@ const App = () => (
   <QueryClientProvider client={queryClient}>
     <ThemeProvider defaultTheme="system" storageKey="survey-ui-theme">
       <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter
-          future={{
-            v7_startTransition: true,
-            v7_relativeSplatPath: true,
-          }}
-        >
-          <Routes>
-            <Route path="/" element={<Landing />} />
-            <Route path="/login" element={<Login />} />
-            <Route path="/dashboard" element={<DashboardLayout />}>
-              <Route index element={<Dashboard />} />
-              <Route path="data" element={<DataExplorer />} />
-              <Route path="review" element={<ReviewWorkspace />} />
-              <Route path="queries" element={<AgentQueries />} />
-              <Route path="projects" element={<Projects />} />
-              <Route path="projects/:projectId" element={<ProjectDetail />} />
-              <Route path="agents" element={<Agents />} />
-              <Route path="users" element={<Users />} />
-              <Route path="surveys" element={<Surveys />} />
-              <Route path="surveys/:surveyId" element={<SurveyDetail />} />
-            </Route>
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </BrowserRouter>
+        <ConfirmActionProvider>
+          <Toaster />
+          <Sonner />
+          <BrowserRouter
+            future={{
+              v7_startTransition: true,
+              v7_relativeSplatPath: true,
+            }}
+          >
+            <Routes>
+              <Route path="/" element={<Landing />} />
+              <Route path="/login" element={<Login />} />
+              <Route path="/dashboard" element={<DashboardLayout />}>
+                <Route index element={<Dashboard />} />
+                <Route path="data" element={<DataExplorer />} />
+                <Route path="review" element={<ReviewWorkspace />} />
+                <Route path="queries" element={<AgentQueries />} />
+                <Route path="projects" element={<Projects />} />
+                <Route path="projects/:projectId" element={<ProjectDetail />} />
+                <Route path="agents" element={<Agents />} />
+                <Route path="users" element={<Users />} />
+                <Route path="surveys" element={<Surveys />} />
+                <Route path="surveys/:surveyId" element={<SurveyDetail />} />
+              </Route>
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </BrowserRouter>
+        </ConfirmActionProvider>
       </TooltipProvider>
     </ThemeProvider>
   </QueryClientProvider>

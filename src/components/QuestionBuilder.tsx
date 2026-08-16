@@ -17,6 +17,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { useConfirmAction } from '@/components/confirm-action';
 
 type Q = SurveyQuestion & { __new?: boolean };
 
@@ -31,6 +32,7 @@ export function QuestionBuilder({
   onChange: (next: Q[]) => void;
   locked: boolean;
 }) {
+  const confirmAction = useConfirmAction();
   const update = (id: string, patch: Partial<Q>) => {
     onChange(questions.map((q) => (q.id === id ? { ...q, ...patch } : q)));
   };
@@ -44,9 +46,19 @@ export function QuestionBuilder({
     onChange(next);
   };
 
-  const remove = (id: string) => {
+  const remove = async (id: string) => {
     const q = questions.find((x) => x.id === id);
     if (locked && q && !q.__new) return;
+    const ok = await confirmAction({
+      title: 'Remove this question?',
+      description: q?.__new
+        ? 'It has not been saved yet and will be dropped from the builder.'
+        : 'It is removed when you save the questionnaire. Existing answers for this question may no longer map.',
+      confirmLabel: 'Remove question',
+      tone: 'danger',
+      facts: q?.label ? [{ label: 'Question', value: q.label }] : undefined,
+    });
+    if (!ok) return;
     onChange(questions.filter((x) => x.id !== id));
   };
 
@@ -155,7 +167,7 @@ export function QuestionBuilder({
                           size="icon"
                           variant="ghost"
                           className="h-7 w-7 rounded-sm text-destructive"
-                          onClick={() => remove(q.id)}
+                          onClick={() => void remove(q.id)}
                         >
                           <Trash2 className="h-3.5 w-3.5" />
                         </Button>
@@ -166,7 +178,7 @@ export function QuestionBuilder({
                         size="icon"
                         variant="ghost"
                         className="h-7 w-7 rounded-sm text-destructive"
-                        onClick={() => remove(q.id)}
+                        onClick={() => void remove(q.id)}
                       >
                         <Trash2 className="h-3.5 w-3.5" />
                       </Button>

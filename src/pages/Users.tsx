@@ -3,6 +3,7 @@ import { Plus, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { agentsAPI, usersAPI } from '@/services/api';
 import { Stamp } from '@/components/Stamp';
+import { useConfirmAction } from '@/components/confirm-action';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -34,6 +35,7 @@ const empty = {
 };
 
 export default function Users() {
+  const confirmAction = useConfirmAction();
   const [users, setUsers] = useState<StaffUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
@@ -66,6 +68,19 @@ export default function Users() {
       toast.error('Email and password (6+) required');
       return;
     }
+    const name = `${form.first_name.trim()} ${form.last_name.trim()}`.trim() || form.email;
+    const ok = await confirmAction({
+      title: 'Create this admin user?',
+      description: 'They will be able to sign in to Tafiti Admin with this email and password.',
+      confirmLabel: 'Create user',
+      tone: 'warning',
+      facts: [
+        { label: 'Name', value: name },
+        { label: 'Email', value: form.email.trim().toLowerCase() },
+        { label: 'Role', value: form.role },
+      ],
+    });
+    if (!ok) return;
     setSaving(true);
     try {
       await usersAPI.create({
@@ -87,10 +102,18 @@ export default function Users() {
   };
 
   const resetPassword = async () => {
-    if (!selectedId || password.length < 6) {
+    if (!selectedId || !selected || password.length < 6) {
       toast.error('Password must be 6+ characters');
       return;
     }
+    const ok = await confirmAction({
+      title: `Reset password for ${selected.first_name} ${selected.last_name}?`,
+      description: 'Their current password will stop working immediately.',
+      confirmLabel: 'Reset password',
+      tone: 'warning',
+      facts: [{ label: 'Email', value: selected.email }],
+    });
+    if (!ok) return;
     setSaving(true);
     try {
       await agentsAPI.update(selectedId, { password });
@@ -104,6 +127,33 @@ export default function Users() {
   };
 
   const setStatus = async (id: string, next: 'active' | 'suspended') => {
+    const user = users.find((u) => u.id === id);
+    const name = user ? `${user.first_name} ${user.last_name}`.trim() : 'this user';
+    const ok = await confirmAction(
+      next === 'suspended'
+        ? {
+            title: `Suspend ${name}?`,
+            description: 'They will not be able to sign in to Tafiti Admin until you activate them again.',
+            confirmLabel: 'Suspend user',
+            tone: 'danger',
+            facts: [
+              { label: 'User', value: name },
+              { label: 'Email', value: user?.email || '—' },
+              { label: 'Role', value: user?.role || '—' },
+            ],
+          }
+        : {
+            title: `Activate ${name}?`,
+            description: 'They will be able to sign in to Tafiti Admin again.',
+            confirmLabel: 'Activate user',
+            tone: 'warning',
+            facts: [
+              { label: 'User', value: name },
+              { label: 'Email', value: user?.email || '—' },
+            ],
+          },
+    );
+    if (!ok) return;
     try {
       if (next === 'active') await agentsAPI.activate(id);
       else await agentsAPI.deactivate(id);
@@ -115,7 +165,20 @@ export default function Users() {
   };
 
   const remove = async (id: string) => {
-    if (!window.confirm('Delete this admin user?')) return;
+    const user = users.find((u) => u.id === id);
+    const name = user ? `${user.first_name} ${user.last_name}`.trim() : 'this admin user';
+    const ok = await confirmAction({
+      title: `Delete ${name}?`,
+      description: 'They will lose admin access immediately. This cannot be undone.',
+      confirmLabel: 'Delete user',
+      tone: 'danger',
+      facts: [
+        { label: 'User', value: name },
+        { label: 'Email', value: user?.email || '—' },
+        { label: 'Role', value: user?.role || '—' },
+      ],
+    });
+    if (!ok) return;
     try {
       await agentsAPI.delete(id);
       toast.success('User deleted');

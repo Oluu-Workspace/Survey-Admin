@@ -13,8 +13,10 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { formatDateTimeEAT } from '@/lib/datetime';
+import { useConfirmAction } from '@/components/confirm-action';
 
 export default function AgentQueries() {
+  const confirmAction = useConfirmAction();
   const [queries, setQueries] = useState<AgentQuery[]>([]);
   const [status, setStatus] = useState('open');
   const [loading, setLoading] = useState(true);
@@ -51,6 +53,29 @@ export default function AgentQueries() {
 
   const resolve = async (opts?: { approve?: boolean; reject?: boolean }) => {
     if (!selected) return;
+    const kind = opts?.reject ? 'reject' : opts?.approve ? 'approve' : 'resolve';
+    const ok = await confirmAction({
+      title:
+        kind === 'reject'
+          ? 'Resolve query and reject the interview?'
+          : kind === 'approve'
+            ? 'Resolve query and approve the interview?'
+            : 'Mark this query resolved?',
+      description:
+        kind === 'reject'
+          ? 'The interview will be rejected and the query closed.'
+          : kind === 'approve'
+            ? 'The interview will be approved and the query closed.'
+            : 'The query will be closed. The interview status is unchanged.',
+      confirmLabel:
+        kind === 'reject' ? 'Reject interview' : kind === 'approve' ? 'Approve interview' : 'Mark resolved',
+      tone: kind === 'reject' ? 'danger' : kind === 'approve' ? 'warning' : 'default',
+      facts: [
+        { label: 'Agent', value: selected.agent_name || selected.agent_id || '—' },
+        { label: 'Survey', value: selected.survey_title || selected.survey_id || '—' },
+      ],
+    });
+    if (!ok) return;
     setBusy(true);
     try {
       await agentQueriesAPI.resolve(selected.id, {

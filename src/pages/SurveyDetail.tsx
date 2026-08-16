@@ -48,6 +48,7 @@ import {
 } from '@/components/ui/select';
 import { dateFilterToParams, isTodayEAT, type DatePreset } from '@/lib/datetime';
 import { SURVEY_STATUS_LABELS, SURVEY_STATUSES } from '@/domain/enums';
+import { useConfirmAction } from '@/components/confirm-action';
 
 type Agent = {
   id: string;
@@ -86,6 +87,7 @@ function progressStamp(n: number, today: number): 'waiting' | 'collecting' | 'sy
 }
 
 const SurveyDetail = () => {
+  const confirmAction = useConfirmAction();
   const { surveyId = '' } = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -262,6 +264,20 @@ const SurveyDetail = () => {
   );
 
   const saveQuestions = async () => {
+    const ok = await confirmAction({
+      title: 'Save this questionnaire?',
+      description: survey?.status === 'active'
+        ? 'This survey is already collecting. Changing questions can break how existing interviews are read. New questions are safer than editing old ones.'
+        : 'Agents will see this questionnaire the next time they sync.',
+      confirmLabel: 'Save questions',
+      tone: survey?.status === 'active' ? 'warning' : 'default',
+      facts: [
+        { label: 'Survey', value: survey?.title || '—' },
+        { label: 'Questions', value: String(questions.length) },
+        { label: 'Status', value: SURVEY_STATUS_LABELS[survey?.status as keyof typeof SURVEY_STATUS_LABELS] || survey?.status || '—' },
+      ],
+    });
+    if (!ok) return;
     setSavingQuestions(true);
     try {
       const cleaned = questions.map(({ __new, ...rest }) => rest);
@@ -276,6 +292,18 @@ const SurveyDetail = () => {
   };
 
   const saveAssignments = async () => {
+    const ok = await confirmAction({
+      title: 'Save agent assignments?',
+      description:
+        'Only the selected agents will see this questionnaire. Unchecked agents lose it from their field app.',
+      confirmLabel: 'Save assignments',
+      tone: 'warning',
+      facts: [
+        { label: 'Survey', value: survey?.title || '—' },
+        { label: 'Agents', value: String(selectedAgentIds.length) },
+      ],
+    });
+    if (!ok) return;
     setAssigning(true);
     try {
       await surveysAPI.assign(surveyId, selectedAgentIds);
@@ -295,6 +323,26 @@ const SurveyDetail = () => {
       toast.error('Add at least one question before starting collection');
       return;
     }
+    if (status === survey?.status) return;
+    const label =
+      SURVEY_STATUS_LABELS[status as keyof typeof SURVEY_STATUS_LABELS] || status;
+    const ok = await confirmAction({
+      title: `Mark this survey as ${label.toLowerCase()}?`,
+      description:
+        status === 'active'
+          ? 'Assigned agents will be able to collect interviews.'
+          : status === 'closed' || status === 'completed'
+            ? 'Agents will no longer be able to collect new interviews.'
+            : 'This survey will be treated as not started.',
+      confirmLabel: `Mark ${label.toLowerCase()}`,
+      tone: status === 'closed' || status === 'completed' ? 'warning' : 'default',
+      facts: [
+        { label: 'Survey', value: survey?.title || '—' },
+        { label: 'Now', value: SURVEY_STATUS_LABELS[survey?.status as keyof typeof SURVEY_STATUS_LABELS] || survey?.status || '—' },
+        { label: 'Change to', value: label },
+      ],
+    });
+    if (!ok) return;
     try {
       await surveysAPI.update(surveyId, { status });
       const label =
@@ -491,6 +539,17 @@ const SurveyDetail = () => {
       toast.error('Title is required');
       return;
     }
+    const ok = await confirmAction({
+      title: 'Save survey details?',
+      description: 'Agents will see the updated title, location, and target on their next sync.',
+      confirmLabel: 'Save details',
+      facts: [
+        { label: 'Title', value: metaForm.title.trim() },
+        { label: 'Ward', value: metaForm.ward.trim() || '—' },
+        { label: 'Village', value: metaForm.village.trim() || '—' },
+      ],
+    });
+    if (!ok) return;
     setSavingMeta(true);
     try {
       const assigned_regions =

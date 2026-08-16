@@ -34,6 +34,7 @@ import { CheckCircle2, CircleDashed, Ban, Play, Trash2, Plus, Search, MoreHorizo
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
+import { useConfirmAction } from '@/components/confirm-action';
 type SurveyRecord = {
   id: string;
   title: string;
@@ -49,6 +50,7 @@ type SurveyRecord = {
 
 const Surveys = () => {
   const navigate = useNavigate();
+  const confirmAction = useConfirmAction();
   const [surveys, setSurveys] = useState<SurveyRecord[]>([]);
   const [counts, setCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
@@ -169,6 +171,25 @@ const Surveys = () => {
       toast.error('Add at least one question before starting collection');
       return;
     }
+    const label =
+      SURVEY_STATUS_LABELS[status as keyof typeof SURVEY_STATUS_LABELS] || status;
+    const ok = await confirmAction({
+      title: `Mark “${survey.title}” as ${label.toLowerCase()}?`,
+      description:
+        status === 'active'
+          ? 'Assigned agents will see this questionnaire and can start collecting interviews.'
+          : status === 'closed' || status === 'completed'
+            ? 'Agents will no longer be able to collect new interviews for this survey.'
+            : 'This survey will be treated as not started. Agents may lose it from their active list.',
+      confirmLabel: `Mark ${label.toLowerCase()}`,
+      tone: status === 'closed' || status === 'completed' ? 'warning' : 'default',
+      facts: [
+        { label: 'Survey', value: survey.title },
+        { label: 'Now', value: SURVEY_STATUS_LABELS[survey.status as keyof typeof SURVEY_STATUS_LABELS] || survey.status },
+        { label: 'Change to', value: label },
+      ],
+    });
+    if (!ok) return;
     try {
       await surveysAPI.update(survey.id, { status });
       const label =
@@ -181,7 +202,19 @@ const Surveys = () => {
   };
 
   const removeSurvey = async (survey: SurveyRecord) => {
-    if (!window.confirm(`Delete “${survey.title}”?`)) return;
+    const ok = await confirmAction({
+      title: `Delete “${survey.title}”?`,
+      description:
+        'The questionnaire and its collected interviews will be removed. This cannot be undone.',
+      confirmLabel: 'Delete survey',
+      tone: 'danger',
+      facts: [
+        { label: 'Survey', value: survey.title },
+        { label: 'Status', value: SURVEY_STATUS_LABELS[survey.status as keyof typeof SURVEY_STATUS_LABELS] || survey.status },
+        { label: 'Responses', value: String(counts[survey.id] ?? 0) },
+      ],
+    });
+    if (!ok) return;
     try {
       await surveysAPI.delete(survey.id);
       toast.success('Deleted');

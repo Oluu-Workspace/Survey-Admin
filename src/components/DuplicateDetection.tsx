@@ -11,6 +11,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { AlertTriangle, Trash2, CheckCircle2, XCircle, Search, Filter } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatDateTimeEAT } from '@/lib/datetime';
+import { useConfirmAction } from '@/components/confirm-action';
 
 export interface DuplicateGroup {
   id: string;
@@ -48,6 +49,7 @@ interface DuplicateDetectionProps {
 }
 
 const DuplicateDetection = ({ responses, onResponseUpdate }: DuplicateDetectionProps) => {
+  const confirmAction = useConfirmAction();
   const [duplicateGroups, setDuplicateGroups] = useState<DuplicateGroup[]>([]);
   const [selectedGroups, setSelectedGroups] = useState<string[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -239,11 +241,23 @@ const DuplicateDetection = ({ responses, onResponseUpdate }: DuplicateDetectionP
     );
   };
 
-  const handleBulkAction = (action: string) => {
+  const handleBulkAction = async (action: string) => {
     if (selectedGroups.length === 0) {
       toast.error('Please select duplicate groups to process');
       return;
     }
+
+    const ok = await confirmAction({
+      title: `${action === 'delete' ? 'Delete' : 'Flag'} ${selectedGroups.length} duplicate group${selectedGroups.length === 1 ? '' : 's'}?`,
+      description:
+        action === 'delete'
+          ? 'Matched interviews in these groups will be processed as deleted. This can remove field data.'
+          : 'Matched interviews in these groups will be flagged for review.',
+      confirmLabel: action === 'delete' ? 'Delete groups' : 'Flag groups',
+      tone: action === 'delete' ? 'danger' : 'warning',
+      facts: [{ label: 'Groups', value: String(selectedGroups.length) }],
+    });
+    if (!ok) return;
 
     const groupsToProcess = duplicateGroups.filter(g => selectedGroups.includes(g.id));
     let processedCount = 0;
@@ -264,9 +278,18 @@ const DuplicateDetection = ({ responses, onResponseUpdate }: DuplicateDetectionP
     toast.success(`${processedCount} responses processed with action: ${action}`);
   };
 
-  const handleGroupAction = (groupId: string, action: string) => {
+  const handleGroupAction = async (groupId: string, action: string) => {
     const group = duplicateGroups.find(g => g.id === groupId);
     if (!group) return;
+
+    const ok = await confirmAction({
+      title: `${action === 'delete' ? 'Delete' : 'Process'} this duplicate group?`,
+      description: 'This applies to every interview in the group.',
+      confirmLabel: action === 'delete' ? 'Delete group' : 'Continue',
+      tone: action === 'delete' ? 'danger' : 'warning',
+      facts: [{ label: 'Interviews', value: String(group.responses.length) }],
+    });
+    if (!ok) return;
 
     group.responses.forEach(response => {
       if (onResponseUpdate) {

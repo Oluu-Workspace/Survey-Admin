@@ -4,6 +4,7 @@ import { toast } from 'sonner';
 import { agentsAPI } from '@/services/api';
 import { Stamp } from '@/components/Stamp';
 import { TablePagination } from '@/components/TablePagination';
+import { useConfirmAction } from '@/components/confirm-action';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -52,6 +53,7 @@ const emptyForm = {
 };
 
 const Agents = () => {
+  const confirmAction = useConfirmAction();
   const [agents, setAgents] = useState<Agent[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -127,6 +129,33 @@ const Agents = () => {
   }, [selectedId]);
 
   const setStatus = async (id: string, next: 'active' | 'suspended') => {
+    const agent = agents.find((a) => a.id === id);
+    const name = agent ? `${agent.first_name} ${agent.last_name}`.trim() : 'this agent';
+    const ok = await confirmAction(
+      next === 'suspended'
+        ? {
+            title: `Suspend ${name}?`,
+            description:
+              'They will be signed out of the field app and cannot collect interviews until you unsuspend them.',
+            confirmLabel: 'Suspend agent',
+            tone: 'danger',
+            facts: [
+              { label: 'Agent', value: name },
+              { label: 'Email', value: agent?.email || '—' },
+            ],
+          }
+        : {
+            title: `Unsuspend ${name}?`,
+            description: 'They will be able to sign in and collect interviews again.',
+            confirmLabel: 'Unsuspend agent',
+            tone: 'warning',
+            facts: [
+              { label: 'Agent', value: name },
+              { label: 'Email', value: agent?.email || '—' },
+            ],
+          },
+    );
+    if (!ok) return;
     try {
       if (next === 'active') await agentsAPI.activate(id);
       else await agentsAPI.deactivate(id);
@@ -142,6 +171,16 @@ const Agents = () => {
       toast.error('Password must be 6+ characters');
       return;
     }
+    const agent = agents.find((a) => a.id === id);
+    const name = agent ? `${agent.first_name} ${agent.last_name}`.trim() : 'this agent';
+    const ok = await confirmAction({
+      title: `Reset password for ${name}?`,
+      description: 'Their current password will stop working immediately. Share the new password with them securely.',
+      confirmLabel: 'Reset password',
+      tone: 'warning',
+      facts: [{ label: 'Agent', value: name }, { label: 'Email', value: agent?.email || '—' }],
+    });
+    if (!ok) return;
     setSaving(true);
     try {
       await agentsAPI.update(id, { password: form.password });
@@ -163,6 +202,19 @@ const Agents = () => {
       toast.error('Password must be 6+ characters');
       return;
     }
+    const name = `${form.first_name.trim()} ${form.last_name.trim()}`;
+    const ok = await confirmAction({
+      title: 'Create this field agent?',
+      description: 'They will be able to sign in to the Tafiti field app with this email and password.',
+      confirmLabel: 'Create agent',
+      facts: [
+        { label: 'Name', value: name },
+        { label: 'Email', value: form.email.trim().toLowerCase() },
+        { label: 'Ward', value: form.ward.trim() || '—' },
+        { label: 'Village', value: form.village.trim() || '—' },
+      ],
+    });
+    if (!ok) return;
     setSaving(true);
     try {
       await agentsAPI.create({
@@ -186,6 +238,19 @@ const Agents = () => {
 
   const saveProfile = async () => {
     if (!selectedId) return;
+    const name = `${form.first_name.trim()} ${form.last_name.trim()}`;
+    const ok = await confirmAction({
+      title: 'Save agent profile?',
+      description: 'These details will update on the field app the next time this agent syncs.',
+      confirmLabel: 'Save profile',
+      facts: [
+        { label: 'Name', value: name || '—' },
+        { label: 'Phone', value: form.phone.trim() || '—' },
+        { label: 'Ward', value: form.ward.trim() || '—' },
+        { label: 'Village', value: form.village.trim() || '—' },
+      ],
+    });
+    if (!ok) return;
     setSaving(true);
     try {
       await agentsAPI.update(selectedId, {
@@ -208,9 +273,20 @@ const Agents = () => {
   };
 
   const deleteAgent = async (id: string) => {
-    if (!window.confirm('Delete this agent? They will lose access and be unassigned from surveys.')) {
-      return;
-    }
+    const agent = agents.find((a) => a.id === id);
+    const name = agent ? `${agent.first_name} ${agent.last_name}`.trim() : 'this agent';
+    const ok = await confirmAction({
+      title: `Delete ${name}?`,
+      description:
+        'They will lose access immediately and be unassigned from surveys. This cannot be undone.',
+      confirmLabel: 'Delete agent',
+      tone: 'danger',
+      facts: [
+        { label: 'Agent', value: name },
+        { label: 'Email', value: agent?.email || '—' },
+      ],
+    });
+    if (!ok) return;
     setSaving(true);
     try {
       await agentsAPI.delete(id);
@@ -226,9 +302,24 @@ const Agents = () => {
 
   const saveAssignments = async () => {
     if (!selectedId) return;
+    const selected = agents.find((a) => a.id === selectedId);
+    const name = selected ? `${selected.first_name} ${selected.last_name}`.trim() : 'this agent';
+    const assigned = assignments.filter((s) => s.assigned);
+    const ok = await confirmAction({
+      title: 'Save survey assignments?',
+      description:
+        'The agent will only see questionnaires you keep checked. Unchecked surveys are removed from their field app.',
+      confirmLabel: 'Save assignments',
+      tone: 'warning',
+      facts: [
+        { label: 'Agent', value: name },
+        { label: 'Surveys', value: String(assigned.length) },
+      ],
+    });
+    if (!ok) return;
     setAssignBusy(true);
     try {
-      const survey_ids = assignments.filter((s) => s.assigned).map((s) => s.id);
+      const survey_ids = assigned.map((s) => s.id);
       await agentsAPI.setSurveyAssignments(selectedId, survey_ids);
       toast.success('Survey assignments saved');
     } catch (err: any) {

@@ -6,8 +6,10 @@ import { ResponseDetailPanel } from '@/components/ResponseDetailPanel';
 import { Stamp } from '@/components/Stamp';
 import { LIFECYCLE_LABELS } from '@/domain/enums';
 import { normalizeQuestions } from '@/domain/question';
+import { useConfirmAction } from '@/components/confirm-action';
 
 const ReviewWorkspace = () => {
+  const confirmAction = useConfirmAction();
   const [queue, setQueue] = useState<SurveyResponse[]>([]);
   const [index, setIndex] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -58,6 +60,29 @@ const ReviewWorkspace = () => {
 
   const act = async (payload: Parameters<typeof responsesAPI.validate>[1]) => {
     if (!current) return;
+    const action =
+      payload.status === 'rejected'
+        ? 'Reject'
+        : payload.status === 'flagged' || payload.flag
+          ? 'Flag'
+          : 'Approve';
+    const ok = await confirmAction({
+      title: `${action} this interview?`,
+      description:
+        action === 'Reject'
+          ? 'The interview will be marked invalid and excluded from approved reporting.'
+          : action === 'Flag'
+            ? 'The interview will stay in review with a quality flag.'
+            : 'The interview will be marked approved and counted in reports.',
+      confirmLabel: action,
+      tone: action === 'Reject' ? 'danger' : action === 'Flag' ? 'warning' : 'default',
+      facts: [
+        { label: 'Respondent', value: current.respondent?.name || current.id.slice(0, 8) },
+        { label: 'Agent', value: current.agent_name || '—' },
+        { label: 'Survey', value: current.survey_title || '—' },
+      ],
+    });
+    if (!ok) return;
     setBusy(true);
     try {
       await responsesAPI.validate(current.id, { ...payload, validation_notes: notes });

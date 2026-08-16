@@ -6,6 +6,7 @@ import { Stamp } from '@/components/Stamp';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { formatDateTimeEAT } from '@/lib/datetime';
+import { useConfirmAction } from '@/components/confirm-action';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 
@@ -40,6 +41,7 @@ export function ResponseDetailPanel({
   onQueryAgent,
   busy,
 }: Props) {
+  const confirmAction = useConfirmAction();
   const duration = r.metadata.duration_seconds;
   const [queryMode, setQueryMode] = useState(false);
   const [queryText, setQueryText] = useState('');
@@ -47,6 +49,17 @@ export function ResponseDetailPanel({
 
   const sendQuery = async () => {
     if (!onQueryAgent || queryText.trim().length < 5) return;
+    const ok = await confirmAction({
+      title: 'Send query to the agent?',
+      description: 'The interview will be flagged and the agent will see this question in the field app.',
+      confirmLabel: 'Send query',
+      tone: 'warning',
+      facts: [
+        { label: 'Agent', value: r.agent_name || '—' },
+        { label: 'Interview', value: r.id.slice(0, 8) },
+      ],
+    });
+    if (!ok) return;
     setQueryBusy(true);
     try {
       await onQueryAgent(queryText.trim());
