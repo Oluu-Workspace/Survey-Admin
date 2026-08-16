@@ -98,6 +98,12 @@ export function ResponseDetailPanel({
           <div>Agent: {r.agent_name || r.agent_id}</div>
           <div>Quality: {r.quality_score}%</div>
           <div>
+            Started:{' '}
+            {formatDateTimeEAT(
+              r.started_at || (typeof r.metadata.started_at === 'string' ? r.metadata.started_at : null),
+            )}
+          </div>
+          <div>
             Submitted:{' '}
             {formatDateTimeEAT(r.submitted_at)}
           </div>

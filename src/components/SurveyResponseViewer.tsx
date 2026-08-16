@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Progress } from '@/components/ui/progress';
 import { Search, Eye, Download, Filter, MapPin, User, Calendar, CheckCircle2, AlertTriangle, XCircle } from 'lucide-react';
 import { toast } from 'sonner';
-import { formatDateTimeEAT } from '@/lib/datetime';
+import { formatDateTimeEAT, isTodayEAT, dateInNairobi, startOfWeekEAT, startOfMonthEAT, todayEAT } from '@/lib/datetime';
 
 export interface SurveyResponse {
   id: string;
@@ -67,26 +67,28 @@ const SurveyResponseViewer = ({ surveyId, surveyTitle, responses, onResponseUpda
       (qualityFilter === 'medium' && response.quality_score >= 70 && response.quality_score < 90) ||
       (qualityFilter === 'low' && response.quality_score < 70);
     
-    // Date range filtering
+    // Date range filtering (Kenya calendar days)
     let matchesDateRange = true;
     if (dateRangeFilter !== 'all') {
-      const responseDate = new Date(response.created_at);
-      const now = new Date();
-      const daysDiff = Math.floor((now.getTime() - responseDate.getTime()) / (1000 * 60 * 60 * 24));
-      
+      const kenyaDay = dateInNairobi(new Date(response.created_at));
+      const today = todayEAT();
       switch (dateRangeFilter) {
         case 'today':
-          matchesDateRange = daysDiff === 0;
+          matchesDateRange = isTodayEAT(response.created_at);
           break;
         case 'week':
-          matchesDateRange = daysDiff <= 7;
+          matchesDateRange = kenyaDay >= startOfWeekEAT(today);
           break;
         case 'month':
-          matchesDateRange = daysDiff <= 30;
+          matchesDateRange = kenyaDay >= startOfMonthEAT(today);
           break;
-        case 'quarter':
-          matchesDateRange = daysDiff <= 90;
+        case 'quarter': {
+          const month = Number(today.slice(5, 7));
+          const qStartMonth = Math.floor((month - 1) / 3) * 3 + 1;
+          const qStart = `${today.slice(0, 4)}-${String(qStartMonth).padStart(2, '0')}-01`;
+          matchesDateRange = kenyaDay >= qStart;
           break;
+        }
       }
     }
     

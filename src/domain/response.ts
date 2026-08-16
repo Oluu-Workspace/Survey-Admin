@@ -36,6 +36,7 @@ export type SurveyResponse = {
   respondent: Respondent;
   location: AdminLocation;
   submitted_at?: string;
+  started_at?: string;
   synced_at?: string;
   created_at?: string;
   updated_at?: string;
@@ -82,6 +83,7 @@ export function mapResponseFromApi(raw: Record<string, unknown>): SurveyResponse
     },
     location: normalizeLocation(raw.location),
     submitted_at: raw.submitted_at as string | undefined,
+    started_at: (raw.started_at as string | undefined) || (raw.metadata as ResponseMetadata | undefined)?.started_at as string | undefined,
     synced_at: raw.synced_at as string | undefined,
     created_at: raw.created_at as string | undefined,
     updated_at: raw.updated_at as string | undefined,

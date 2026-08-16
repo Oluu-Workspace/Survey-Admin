@@ -5,6 +5,12 @@ import {
   type AnalyticsFilters,
   type ResponseFacets,
 } from '@/components/AnalyticsFilterBar';
+import {
+  SurveyResultsFilterBar,
+  normalizeSurveyListFilters,
+  surveyListFilterSummary,
+  type SurveyListFilters,
+} from '@/components/SurveyResultsFilterBar';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { PoweredByStrategicInsight } from '@/components/PoweredByStrategicInsight';
@@ -17,11 +23,13 @@ type Props = {
   responseTotal: number;
   questionCount: number;
   facets: ResponseFacets | null;
-  filters: AnalyticsFilters;
-  onFiltersChange: (next: Partial<AnalyticsFilters>) => void;
+  reportFilters: SurveyListFilters;
+  onReportFiltersChange: (next: Partial<SurveyListFilters>) => void;
+  onApplyReportFilters: () => void;
+  onClearReportFilters: () => void;
+  extraFilters: AnalyticsFilters;
+  onExtraFiltersChange: (next: Partial<AnalyticsFilters>) => void;
   agents: AgentOption[];
-  selectedAgentId: string;
-  onAgentChange: (id: string) => void;
   compareBy: string;
   compareOptions: { id: string; label: string }[];
   onCompareByChange: (v: string) => void;
@@ -44,11 +52,13 @@ export function ReportGenerationWizard({
   responseTotal,
   questionCount,
   facets,
-  filters,
-  onFiltersChange,
+  reportFilters,
+  onReportFiltersChange,
+  onApplyReportFilters,
+  onClearReportFilters,
+  extraFilters,
+  onExtraFiltersChange,
   agents,
-  selectedAgentId,
-  onAgentChange,
   compareBy,
   compareOptions,
   onCompareByChange,
@@ -62,23 +72,29 @@ export function ReportGenerationWizard({
   const [wantCsv, setWantCsv] = useState(false);
 
   const filterSummary = useMemo(() => {
-    const parts: string[] = [];
-    if (selectedAgentId) {
-      parts.push(`Agent: ${agents.find((a) => a.id === selectedAgentId)?.name || selectedAgentId}`);
+    const applied = normalizeSurveyListFilters(reportFilters);
+    const { dateLine, parts } = surveyListFilterSummary(applied, agents);
+    const all = [
+      dateLine ? `${dateLine.title}: ${dateLine.value}` : null,
+      ...parts,
+    ].filter(Boolean) as string[];
+    if (extraFilters.county) all.push(`County: ${extraFilters.county}`);
+    if (extraFilters.status) all.push(`Status: ${extraFilters.status}`);
+    if (extraFilters.lifecycle) all.push(`Stage: ${extraFilters.lifecycle}`);
+    if (extraFilters.answerQuestionId && extraFilters.answerValue) {
+      all.push(`Answer filter: ${extraFilters.answerValue}`);
     }
-    if (filters.county) parts.push(`County: ${filters.county}`);
-    if (filters.ward) parts.push(`Ward: ${filters.ward}`);
-    if (filters.status) parts.push(`Status: ${filters.status}`);
-    if (filters.lifecycle) parts.push(`Stage: ${filters.lifecycle}`);
-    if (filters.answerQuestionId && filters.answerValue) {
-      parts.push(`Answer filter: ${filters.answerValue}`);
-    }
-    if (compareBy) parts.push(`Compare by: ${compareBy}`);
-    return parts;
-  }, [agents, compareBy, filters, selectedAgentId]);
+    if (compareBy) all.push(`Compare by: ${compareBy}`);
+    return all;
+  }, [agents, compareBy, extraFilters, reportFilters]);
 
   const canNext = step < 4 && !(step === 3 && !wantPdf && !wantCsv);
   const canGenerate = responseTotal > 0 && (wantPdf || wantCsv) && !busy;
+
+  const goNext = () => {
+    if (step === 2) onApplyReportFilters();
+    setStep((s) => Math.min(4, s + 1));
+  };
 
   return (
     <div className="space-y-5 border border-border bg-card p-5 md:p-6">
@@ -153,16 +169,26 @@ export function ReportGenerationWizard({
       {step === 2 ? (
         <div className="space-y-3">
           <p className="text-sm text-muted-foreground">
-            Leave filters empty to include all responses. Filters apply to both the PDF report and
-            CSV export.
+            Use the same calendar, agent, ward, and village filters as the survey results page.
+            Leave them empty to include all responses. Apply filters, then generate the report.
           </p>
-          <AnalyticsFilterBar
-            facets={facets}
-            filters={filters}
-            onChange={onFiltersChange}
+          <SurveyResultsFilterBar
+            heading="Filter report data"
+            draft={reportFilters}
+            onDraftChange={onReportFiltersChange}
+            onApply={onApplyReportFilters}
+            onClear={onClearReportFilters}
+            applying={busy}
             agents={agents}
-            selectedAgentId={selectedAgentId}
-            onAgentChange={onAgentChange}
+            facets={facets}
+          />
+          <p className="text-xs text-muted-foreground">Optional extras (not required)</p>
+          <AnalyticsFilterBar
+            hideCoreFilters
+            facets={facets}
+            filters={extraFilters}
+            onChange={onExtraFiltersChange}
+            agents={agents}
             compareBy={compareBy}
             compareOptions={compareOptions}
             onCompareByChange={onCompareByChange}
@@ -210,7 +236,7 @@ export function ReportGenerationWizard({
               Survey: <span className="text-foreground">{surveyTitle}</span>
             </li>
             <li>
-              Responses in scope:{' '}
+              Responses in questionnaire:{' '}
               <span className="ledger-count text-foreground">{responseTotal.toLocaleString()}</span>
             </li>
             <li>
@@ -234,7 +260,7 @@ export function ReportGenerationWizard({
                 disabled={!canGenerate}
                 onClick={() => void onGeneratePdf()}
               >
-                {busy ? 'Working…' : 'Generate PDF report'}
+                {busy ? 'Working…' : 'Generate report'}
               </Button>
             ) : null}
             {wantCsv ? (
@@ -267,7 +293,7 @@ export function ReportGenerationWizard({
             size="sm"
             className="rounded-sm"
             disabled={!canNext || (step === 1 && responseTotal === 0)}
-            onClick={() => setStep((s) => Math.min(4, s + 1))}
+            onClick={goNext}
           >
             Continue
             <ChevronRight className="ml-1 h-4 w-4" />

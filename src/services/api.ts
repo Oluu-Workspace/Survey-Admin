@@ -200,13 +200,18 @@ export const surveysAPI = {
     id: string,
     params?: {
       agent_id?: string;
+      agent_ids?: string;
       compare_by?: string;
       county?: string;
       ward?: string;
+      village?: string;
       status?: string;
       lifecycle_stage?: string;
       answer_question_id?: string;
       answer_value?: string;
+      date_preset?: string;
+      date_from?: string;
+      date_to?: string;
     },
   ) => {
     const { data } = await api.get(`/surveys/${id}/analytics`, { params });
@@ -218,6 +223,8 @@ export const surveysAPI = {
     return data as {
       counties: string[];
       wards: string[];
+      villages: string[];
+      villages_by_ward: Record<string, string[]>;
       statuses: string[];
       lifecycle_stages: string[];
       filterable_questions: Array<{ id: string; label: string; options: string[] }>;
@@ -246,12 +253,17 @@ export const responsesAPI = {
     lifecycle_stage?: string;
     county?: string;
     ward?: string;
+    village?: string;
     search?: string;
     q?: string;
     sort_by?: string;
     sort_order?: 'asc' | 'desc';
     answer_question_id?: string;
     answer_value?: string;
+    agent_ids?: string;
+    date_preset?: string;
+    date_from?: string;
+    date_to?: string;
   }) => {
     const { data } = await api.get('/responses', {
       params: {
@@ -340,6 +352,18 @@ export const operationsAPI = {
   },
 };
 
+export type AfterHoursOverride = {
+  id: string;
+  scope: 'all' | 'survey' | 'agent' | string;
+  until?: string | null;
+  label?: string;
+  survey_id?: string;
+  survey_title?: string;
+  agent_id?: string;
+  agent_name?: string;
+  created_at?: string;
+};
+
 export type CollectionHoursSettings = {
   timezone: string;
   start: string;
@@ -347,6 +371,11 @@ export type CollectionHoursSettings = {
   after_hours_open: boolean;
   after_hours_until?: string | null;
   effective_open?: boolean;
+  unrestricted?: boolean;
+  allowed_for_me?: boolean;
+  allowed_survey_ids?: string[];
+  overrides?: AfterHoursOverride[];
+  next_morning_8am?: string | null;
   updated_at?: string | null;
   updated_by?: string | null;
 };
@@ -362,6 +391,22 @@ export const settingsAPI = {
     clear_until?: boolean;
   }): Promise<CollectionHoursSettings> => {
     const { data } = await api.put('/settings/collection-hours', payload);
+    return data.collection_hours;
+  },
+  extendCollectionHours: async (payload: {
+    scope: 'all' | 'survey' | 'agent';
+    until?: string | null;
+    until_morning?: boolean;
+    survey_id?: string;
+    survey_title?: string;
+    agent_id?: string;
+    agent_name?: string;
+  }): Promise<CollectionHoursSettings> => {
+    const { data } = await api.post('/settings/collection-hours/overrides', payload);
+    return data.collection_hours;
+  },
+  revokeCollectionHoursOverride: async (id: string): Promise<CollectionHoursSettings> => {
+    const { data } = await api.delete(`/settings/collection-hours/overrides/${id}`);
     return data.collection_hours;
   },
 };

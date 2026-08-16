@@ -26,6 +26,13 @@ import {
   generateQuestionInsight,
 } from '@/lib/researchInsights';
 import { ReportGenerationWizard } from '@/components/ReportGenerationWizard';
+import {
+  EMPTY_SURVEY_LIST_FILTERS,
+  normalizeSurveyListFilters,
+  surveyListFilterSummary,
+  surveyListFiltersToParams,
+  type SurveyListFilters,
+} from '@/components/SurveyResultsFilterBar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -39,6 +46,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { dateFilterToParams, isTodayEAT, type DatePreset } from '@/lib/datetime';
 import { SURVEY_STATUS_LABELS, SURVEY_STATUSES } from '@/domain/enums';
 
 type Agent = {
@@ -68,7 +76,7 @@ function agentName(a?: Agent | null) {
 }
 
 function isToday(iso?: string) {
-  return !!iso && new Date(iso).toDateString() === new Date().toDateString();
+  return isTodayEAT(iso);
 }
 
 function progressStamp(n: number, today: number): 'waiting' | 'collecting' | 'synced' {
@@ -106,11 +114,16 @@ const SurveyDetail = () => {
   const [analyticsFilters, setAnalyticsFilters] = useState<AnalyticsFilters>({
     county: '',
     ward: '',
+    village: '',
     status: '',
     lifecycle: '',
     answerQuestionId: '',
     answerValue: '',
+    datePreset: '',
+    dateFrom: '',
+    dateTo: '',
   });
+  const [reportFilters, setReportFilters] = useState<SurveyListFilters>(EMPTY_SURVEY_LIST_FILTERS);
   const [metaForm, setMetaForm] = useState({
     title: '',
     description: '',
@@ -168,10 +181,12 @@ const SurveyDetail = () => {
         compare_by: compareBy || undefined,
         county: analyticsFilters.county || undefined,
         ward: analyticsFilters.ward || undefined,
+        village: analyticsFilters.village || undefined,
         status: analyticsFilters.status || undefined,
         lifecycle_stage: analyticsFilters.lifecycle || undefined,
         answer_question_id: analyticsFilters.answerQuestionId || undefined,
         answer_value: analyticsFilters.answerValue || undefined,
+        ...dateFilterToParams(analyticsFilters),
       });
       setSurveyAnalytics(analyticsRes);
       if (!compareBy && analyticsRes?.compare_by) {
@@ -321,10 +336,30 @@ const SurveyDetail = () => {
     await refreshAnalytics();
   };
 
-  const runPdfReport = async () => {
+  const commitReportFilters = () => {
+    setReportFilters((f) => normalizeSurveyListFilters(f));
+  };
+
+  const listFiltersForExport = (source: 'report' | 'analysis'): SurveyListFilters => {
+    if (source === 'analysis') {
+      return normalizeSurveyListFilters({
+        datePreset: (analyticsFilters.datePreset || '') as DatePreset,
+        dateFrom: analyticsFilters.dateFrom,
+        dateTo: analyticsFilters.dateTo,
+        agentIds: analyticsAgentId ? [analyticsAgentId] : [],
+        ward: analyticsFilters.ward,
+        village: analyticsFilters.village,
+      });
+    }
+    return normalizeSurveyListFilters(reportFilters);
+  };
+
+  const runPdfReport = async (source: 'report' | 'analysis' = 'report') => {
     setExportBusy(true);
     try {
       toast.message('Syncing all responses and analytics…');
+      const applied = listFiltersForExport(source);
+      if (source === 'report') setReportFilters(applied);
       const {
         bundle: reportBundle,
         rows,
@@ -338,9 +373,8 @@ const SurveyDetail = () => {
         (id) => agentName(agentMap.get(id)),
         compareBy || undefined,
         {
-          agent_id: analyticsAgentId || undefined,
+          ...surveyListFiltersToParams(applied),
           county: analyticsFilters.county || undefined,
-          ward: analyticsFilters.ward || undefined,
           status: analyticsFilters.status || undefined,
           lifecycle_stage: analyticsFilters.lifecycle || undefined,
           answer_question_id: analyticsFilters.answerQuestionId || undefined,
@@ -351,12 +385,12 @@ const SurveyDetail = () => {
       for (const q of perQ) {
         if (q?.id) questionInsights[q.id] = generateQuestionInsight(q);
       }
-      const filterParts: string[] = [];
-      if (analyticsAgentId) {
-        filterParts.push(`Agent: ${agentName(agentMap.get(analyticsAgentId))}`);
-      }
+      const { dateLine, parts } = surveyListFilterSummary(applied, fieldAgents.map((row) => ({
+        id: row.id,
+        name: agentName(row.agent),
+      })));
+      const filterParts = [...parts];
       if (analyticsFilters.county) filterParts.push(`County: ${analyticsFilters.county}`);
-      if (analyticsFilters.ward) filterParts.push(`Ward: ${analyticsFilters.ward}`);
       if (analyticsFilters.status) filterParts.push(`Status: ${analyticsFilters.status}`);
       if (analyticsFilters.lifecycle) filterParts.push(`Stage: ${analyticsFilters.lifecycle}`);
       if (analyticsFilters.answerQuestionId && analyticsFilters.answerValue) {
@@ -370,6 +404,8 @@ const SurveyDetail = () => {
         return n && n !== 'unknown ward' && n !== 'unknown';
       }).length;
       const uniqueAgents = reportBundle.byAgent.filter((a) => a.count > 0).length;
+      const selectedPeriod = dateLine ? `${dateLine.title}: ${dateLine.value}` : undefined;
+      const dataPeriod = collectionPeriodFromResponses(rows);
       const result = openPrintableReport({
         surveyTitle: survey.title || 'Survey',
         surveySubtitle: survey.description || undefined,
@@ -386,7 +422,7 @@ const SurveyDetail = () => {
           excluded: reportBundle.totalExcluded,
           completionPct: reportBundle.completionRate,
           perQuestion: perQ,
-          collectionPeriod: collectionPeriodFromResponses(rows),
+          collectionPeriod: selectedPeriod || dataPeriod,
           uniqueWards,
           uniqueAgents,
         }),
@@ -399,6 +435,11 @@ const SurveyDetail = () => {
         totalResponsesFetched: responseCount,
         analyticsFromApi,
         filterSummary: filterParts.length ? filterParts.join(' · ') : undefined,
+        reportPeriod: dateLine
+          ? dateLine
+          : dataPeriod
+            ? { title: 'Report Period' as const, value: dataPeriod }
+            : undefined,
       });
       if (!analyticsFromApi) {
         toast.message('Analytics API unavailable — report uses client-side calculations.');
@@ -425,10 +466,11 @@ const SurveyDetail = () => {
     setExportBusy(true);
     try {
       toast.message('Exporting CSV…');
+      const applied = normalizeSurveyListFilters(reportFilters);
+      setReportFilters(applied);
       const rows = await fetchAllSurveyResponses(surveyId, {
-        agent_id: analyticsAgentId || undefined,
+        ...surveyListFiltersToParams(applied),
         county: analyticsFilters.county || undefined,
-        ward: analyticsFilters.ward || undefined,
         status: analyticsFilters.status || undefined,
         lifecycle_stage: analyticsFilters.lifecycle || undefined,
         answer_question_id: analyticsFilters.answerQuestionId || undefined,
@@ -906,7 +948,7 @@ const SurveyDetail = () => {
                 onCompareByChange={setCompareBy}
                 loadingAnalytics={analyticsLoading}
                 hideScopeFilters
-                onExportReport={() => void runPdfReport()}
+                onExportReport={() => void runPdfReport('analysis')}
               />
               <div>
                 <h2 className="mb-3 font-display text-sm font-semibold">Question deep dive</h2>
@@ -923,20 +965,22 @@ const SurveyDetail = () => {
             responseTotal={responseTotal}
             questionCount={questions.length}
             facets={responseFacets}
-            filters={analyticsFilters}
-            onFiltersChange={(next) => setAnalyticsFilters((prev) => ({ ...prev, ...next }))}
+            reportFilters={reportFilters}
+            onReportFiltersChange={(next) => setReportFilters((prev) => ({ ...prev, ...next }))}
+            onApplyReportFilters={commitReportFilters}
+            onClearReportFilters={() => setReportFilters(EMPTY_SURVEY_LIST_FILTERS)}
+            extraFilters={analyticsFilters}
+            onExtraFiltersChange={(next) => setAnalyticsFilters((prev) => ({ ...prev, ...next }))}
             agents={fieldAgents.map((row) => ({
               id: row.id,
               name: agentName(row.agent),
             }))}
-            selectedAgentId={analyticsAgentId}
-            onAgentChange={setAnalyticsAgentId}
             compareBy={compareBy}
             compareOptions={surveyAnalytics?.compare_options || []}
             onCompareByChange={setCompareBy}
             analyticsLoading={analyticsLoading}
             busy={exportBusy}
-            onGeneratePdf={() => void runPdfReport()}
+            onGeneratePdf={() => void runPdfReport('report')}
             onGenerateCsv={() => void runCsvExport()}
           />
         </TabsContent>

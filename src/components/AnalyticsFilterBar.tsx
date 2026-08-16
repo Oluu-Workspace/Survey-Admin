@@ -6,11 +6,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { KenyaDateRangePicker } from '@/components/KenyaDateRangePicker';
 import { LIFECYCLE_LABELS, LIFECYCLE_STAGES } from '@/domain/enums';
+import type { DatePreset } from '@/lib/datetime';
 
 export type ResponseFacets = {
   counties: string[];
   wards: string[];
+  villages?: string[];
+  villages_by_ward?: Record<string, string[]>;
   statuses: string[];
   lifecycle_stages: string[];
   filterable_questions: Array<{ id: string; label: string; options: string[] }>;
@@ -19,10 +23,14 @@ export type ResponseFacets = {
 export type AnalyticsFilters = {
   county: string;
   ward: string;
+  village: string;
   status: string;
   lifecycle: string;
   answerQuestionId: string;
   answerValue: string;
+  datePreset: string;
+  dateFrom: string;
+  dateTo: string;
 };
 
 type Props = {
@@ -36,6 +44,8 @@ type Props = {
   compareOptions?: { id: string; label: string }[];
   onCompareByChange?: (id: string) => void;
   loading?: boolean;
+  /** Hide agent / geography / date — used when SurveyResultsFilterBar already shows them. */
+  hideCoreFilters?: boolean;
 };
 
 export function AnalyticsFilterBar({
@@ -49,75 +59,134 @@ export function AnalyticsFilterBar({
   compareOptions = [],
   onCompareByChange,
   loading,
+  hideCoreFilters,
 }: Props) {
   const answerQuestion = facets?.filterable_questions.find((q) => q.id === filters.answerQuestionId);
 
   return (
-    <div className="flex flex-wrap items-end gap-3 border border-border bg-card p-3">
-      <div className="space-y-1">
-        <Label className="font-display text-xs uppercase tracking-wide">Agent</Label>
-        <Select
-          value={selectedAgentId || 'all'}
-          onValueChange={(v) => onAgentChange?.(v === 'all' ? '' : v)}
-        >
-          <SelectTrigger className="h-9 w-[180px] rounded-sm">
-            <SelectValue placeholder="All agents" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All agents</SelectItem>
-            {agents.map((a) => (
-              <SelectItem key={a.id} value={a.id}>
-                {a.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-      <div className="space-y-1">
-        <Label className="font-display text-xs uppercase tracking-wide">County</Label>
-        <Select
-          value={filters.county || 'all'}
-          onValueChange={(v) => onChange({ county: v === 'all' ? '' : v, ward: '' })}
-        >
-          <SelectTrigger className="h-9 w-[150px] rounded-sm">
-            <SelectValue placeholder="All counties" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All counties</SelectItem>
-            {(facets?.counties || []).map((c) => (
-              <SelectItem key={c} value={c}>
-                {c}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-      <div className="space-y-1">
-        <Label className="font-display text-xs uppercase tracking-wide">Ward</Label>
-        <Select
-          value={filters.ward || 'all'}
-          onValueChange={(v) => onChange({ ward: v === 'all' ? '' : v })}
-        >
-          <SelectTrigger className="h-9 w-[150px] rounded-sm">
-            <SelectValue placeholder="All wards" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All wards</SelectItem>
-            {(facets?.wards || []).map((w) => (
-              <SelectItem key={w} value={w}>
-                {w}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
+    <div className="flex flex-wrap items-end gap-4 border border-border bg-card p-4 md:p-5">
+      {!hideCoreFilters ? (
+        <>
+          <div className="space-y-1">
+            <Label className="font-display text-xs uppercase tracking-wide">Agent</Label>
+            <Select
+              value={selectedAgentId || 'all'}
+              onValueChange={(v) => onAgentChange?.(v === 'all' ? '' : v)}
+            >
+              <SelectTrigger className="h-10 min-w-[10rem] w-[180px] rounded-sm">
+                <SelectValue placeholder="All agents" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All agents</SelectItem>
+                {agents.map((a) => (
+                  <SelectItem key={a.id} value={a.id}>
+                    {a.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
+            <Label className="font-display text-xs uppercase tracking-wide">County</Label>
+            <Select
+              value={filters.county || 'all'}
+              onValueChange={(v) => onChange({ county: v === 'all' ? '' : v, ward: '' })}
+            >
+              <SelectTrigger className="h-10 min-w-[10rem] w-[150px] rounded-sm">
+                <SelectValue placeholder="All counties" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All counties</SelectItem>
+                {(facets?.counties || []).map((c) => (
+                  <SelectItem key={c} value={c}>
+                    {c}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
+            <Label className="font-display text-xs uppercase tracking-wide">Ward</Label>
+            <Select
+              value={filters.ward || 'all'}
+              onValueChange={(v) => onChange({ ward: v === 'all' ? '' : v, village: '' })}
+            >
+              <SelectTrigger className="h-10 min-w-[10rem] w-[150px] rounded-sm">
+                <SelectValue placeholder="All wards" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All wards</SelectItem>
+                {(facets?.wards || []).map((w) => (
+                  <SelectItem key={w} value={w}>
+                    {w}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
+            <Label className="font-display text-xs uppercase tracking-wide">Village</Label>
+            <Select
+              value={filters.village || 'all'}
+              onValueChange={(v) => onChange({ village: v === 'all' ? '' : v })}
+            >
+              <SelectTrigger className="h-10 min-w-[10rem] w-[160px] rounded-sm">
+                <SelectValue placeholder="All villages" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All villages</SelectItem>
+                {(filters.ward && facets?.villages_by_ward?.[filters.ward]
+                  ? facets.villages_by_ward[filters.ward]
+                  : facets?.villages || []
+                ).map((v) => (
+                  <SelectItem key={v} value={v}>
+                    {v}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <KenyaDateRangePicker
+            dateFrom={filters.dateFrom}
+            dateTo={filters.dateTo}
+            onChange={(next) =>
+              onChange({
+                dateFrom: next.dateFrom,
+                dateTo: next.dateTo,
+                datePreset: next.datePreset as DatePreset,
+              })
+            }
+            disabled={loading}
+          />
+        </>
+      ) : (
+        <div className="space-y-1">
+          <Label className="font-display text-xs uppercase tracking-wide">County</Label>
+          <Select
+            value={filters.county || 'all'}
+            onValueChange={(v) => onChange({ county: v === 'all' ? '' : v })}
+          >
+            <SelectTrigger className="h-10 min-w-[10rem] w-[150px] rounded-sm">
+              <SelectValue placeholder="All counties" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All counties</SelectItem>
+              {(facets?.counties || []).map((c) => (
+                <SelectItem key={c} value={c}>
+                  {c}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
       <div className="space-y-1">
         <Label className="font-display text-xs uppercase tracking-wide">Status</Label>
         <Select
           value={filters.status || 'all'}
           onValueChange={(v) => onChange({ status: v === 'all' ? '' : v })}
         >
-          <SelectTrigger className="h-9 w-[130px] rounded-sm">
+          <SelectTrigger className="h-10 min-w-[10rem] w-[130px] rounded-sm">
             <SelectValue placeholder="All status" />
           </SelectTrigger>
           <SelectContent>
@@ -138,7 +207,7 @@ export function AnalyticsFilterBar({
           value={filters.lifecycle || 'all'}
           onValueChange={(v) => onChange({ lifecycle: v === 'all' ? '' : v })}
         >
-          <SelectTrigger className="h-9 w-[140px] rounded-sm">
+          <SelectTrigger className="h-10 min-w-[10rem] w-[140px] rounded-sm">
             <SelectValue placeholder="All stages" />
           </SelectTrigger>
           <SelectContent>
@@ -162,7 +231,7 @@ export function AnalyticsFilterBar({
             })
           }
         >
-          <SelectTrigger className="h-9 w-[200px] rounded-sm">
+          <SelectTrigger className="h-10 min-w-[10rem] w-[200px] rounded-sm">
             <SelectValue placeholder="Question" />
           </SelectTrigger>
           <SelectContent>
@@ -182,7 +251,7 @@ export function AnalyticsFilterBar({
             value={filters.answerValue || 'all'}
             onValueChange={(v) => onChange({ answerValue: v === 'all' ? '' : v })}
           >
-            <SelectTrigger className="h-9 w-[160px] rounded-sm">
+            <SelectTrigger className="h-10 min-w-[10rem] w-[160px] rounded-sm">
               <SelectValue placeholder="Value" />
             </SelectTrigger>
             <SelectContent>
@@ -203,7 +272,7 @@ export function AnalyticsFilterBar({
           onValueChange={(v) => onCompareByChange?.(v)}
           disabled={!compareOptions.length}
         >
-          <SelectTrigger className="h-9 w-[200px] rounded-sm">
+          <SelectTrigger className="h-10 min-w-[10rem] w-[200px] rounded-sm">
             <SelectValue placeholder="Demographics" />
           </SelectTrigger>
           <SelectContent>

@@ -11,19 +11,26 @@ function Calendar({ className, classNames, showOutsideDays = true, ...props }: C
   return (
     <DayPicker
       showOutsideDays={showOutsideDays}
-      className={cn("p-3", className)}
+      className={cn("p-2", className)}
       classNames={{
         months: "flex flex-col sm:flex-row space-y-4 sm:space-x-4 sm:space-y-0",
-        month: "space-y-4",
-        caption: "flex justify-center pt-1 relative items-center",
-        caption_label: "text-sm font-medium",
-        nav: "space-x-1 flex items-center",
+        month: "space-y-3",
+        caption: "flex justify-center pt-1 relative items-center px-9 min-h-9",
+        caption_label: "text-sm font-medium flex items-center gap-1",
+        caption_dropdowns: "flex items-center justify-center gap-3",
+        dropdown_month: "relative inline-flex h-8 min-w-[7.5rem] items-center",
+        dropdown_year: "relative inline-flex h-8 min-w-[4.75rem] items-center",
+        dropdown:
+          "absolute inset-0 z-10 cursor-pointer opacity-0 appearance-none w-full",
+        dropdown_icon: "ml-0.5 h-3.5 w-3.5 opacity-60",
+        vhidden: "sr-only",
+        nav: "flex items-center",
         nav_button: cn(
           buttonVariants({ variant: "outline" }),
-          "h-7 w-7 bg-transparent p-0 opacity-50 hover:opacity-100",
+          "h-8 w-8 bg-transparent p-0 opacity-70 hover:opacity-100",
         ),
-        nav_button_previous: "absolute left-1",
-        nav_button_next: "absolute right-1",
+        nav_button_previous: "absolute left-0",
+        nav_button_next: "absolute right-0",
         table: "w-full border-collapse space-y-1",
         head_row: "flex",
         head_cell: "text-muted-foreground rounded-md w-9 font-normal text-[0.8rem]",

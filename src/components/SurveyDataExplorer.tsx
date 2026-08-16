@@ -10,8 +10,10 @@ import {
   RefreshCw,
   Save,
   Search,
+  ArrowDown,
+  ArrowUp,
 } from 'lucide-react';
-import { responsesAPI, surveysAPI, agentQueriesAPI } from '@/services/api';
+import { responsesAPI, surveysAPI, agentQueriesAPI, agentsAPI } from '@/services/api';
 import type { ResponseFacets } from '@/components/AnalyticsFilterBar';
 import type { SurveyResponse } from '@/domain';
 import { isUnknownLocationValue } from '@/domain/constants';
@@ -23,8 +25,17 @@ import { exportResponsesCsv as exportWithAnswers } from '@/lib/analytics';
 import { ResponseDetailPanel } from '@/components/ResponseDetailPanel';
 import { Stamp } from '@/components/Stamp';
 import { TablePagination } from '@/components/TablePagination';
+import {
+  EMPTY_SURVEY_LIST_FILTERS,
+  SurveyResultsFilterBar,
+  normalizeSurveyListFilters,
+  surveyListFiltersActive,
+  surveyListFiltersToParams,
+  type SurveyListFilters,
+} from '@/components/SurveyResultsFilterBar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
   DropdownMenu,
@@ -42,7 +53,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Label } from '@/components/ui/label';
 
 const VIEWS_KEY = 'tafiti-survey-data-views';
 
@@ -86,7 +96,7 @@ const META_COLUMNS: { key: MetaColumnKey; label: string }[] = [
   { key: 'quality', label: 'Quality' },
 ];
 
-const DEFAULT_META_VISIBLE: MetaColumnKey[] = ['agent', 'submitted', 'quality'];
+const DEFAULT_META_VISIBLE: MetaColumnKey[] = ['agent', 'submitted', 'ward', 'village', 'quality'];
 
 function questionColumnKey(questionId: string): ColumnKey {
   return `q:${questionId}`;
@@ -175,7 +185,6 @@ export function SurveyDataExplorer({
   const [lifecycle, setLifecycle] = useState('all');
   const [status, setStatus] = useState('all');
   const [county, setCounty] = useState('');
-  const [ward, setWard] = useState('');
   const [answerQuestionId, setAnswerQuestionId] = useState('');
   const [answerValue, setAnswerValue] = useState('');
   const [facets, setFacets] = useState<ResponseFacets | null>(facetsProp ?? null);
@@ -190,6 +199,15 @@ export function SurveyDataExplorer({
   const [actionBusy, setActionBusy] = useState(false);
   const [savedViews, setSavedViews] = useState<SavedView[]>(loadViews);
   const [questions, setQuestions] = useState<SurveyQuestion[]>(questionsProp || []);
+  const [localAgents, setLocalAgents] = useState(agentOptions);
+  const [draftFilters, setDraftFilters] = useState<SurveyListFilters>(() => ({
+    ...EMPTY_SURVEY_LIST_FILTERS,
+    agentIds: agentFilter ? [agentFilter] : [],
+  }));
+  const [appliedFilters, setAppliedFilters] = useState<SurveyListFilters>(() => ({
+    ...EMPTY_SURVEY_LIST_FILTERS,
+    agentIds: agentFilter ? [agentFilter] : [],
+  }));
 
   useEffect(() => {
     if (questionsProp?.length) setQuestions(questionsProp);
@@ -227,6 +245,43 @@ export function SurveyDataExplorer({
   }, [questions, columnsReady]);
 
   useEffect(() => {
+    if (agentOptions.length) setLocalAgents(agentOptions);
+  }, [agentOptions]);
+
+  useEffect(() => {
+    if (agentOptions.length || !surveyId) return;
+    void agentsAPI
+      .getAll({ per_page: 500 })
+      .then((data) => {
+        const list = data.agents || data || [];
+        setLocalAgents(
+          (Array.isArray(list) ? list : []).map(
+            (a: { id: string; first_name?: string; last_name?: string; email?: string }) => ({
+              id: a.id,
+              name: `${a.first_name || ''} ${a.last_name || ''}`.trim() || a.email || a.id,
+            }),
+          ),
+        );
+      })
+      .catch(() => undefined);
+  }, [surveyId, agentOptions.length]);
+
+  useEffect(() => {
+    if (!agentFilter) return;
+    setDraftFilters((f) =>
+      f.agentIds.length === 1 && f.agentIds[0] === agentFilter ? f : { ...f, agentIds: [agentFilter] },
+    );
+    setAppliedFilters((f) =>
+      f.agentIds.length === 1 && f.agentIds[0] === agentFilter ? f : { ...f, agentIds: [agentFilter] },
+    );
+  }, [agentFilter]);
+
+  const listFilterParams = useMemo(
+    () => surveyListFiltersToParams(appliedFilters),
+    [appliedFilters],
+  );
+
+  useEffect(() => {
     if (facetsProp) setFacets(facetsProp);
   }, [facetsProp]);
 
@@ -246,14 +301,13 @@ export function SurveyDataExplorer({
     debouncedSearch,
     lifecycle,
     status,
-    agentFilter,
     county,
-    ward,
     answerQuestionId,
     answerValue,
     sortBy,
     sortOrder,
     surveyId,
+    listFilterParams,
   ]);
 
   useEffect(() => {
@@ -269,13 +323,12 @@ export function SurveyDataExplorer({
           lifecycle_stage: lifecycle !== 'all' ? lifecycle : undefined,
           status: status !== 'all' ? status : undefined,
           survey_id: surveyId,
-          agent_id: agentFilter || undefined,
           county: county || undefined,
-          ward: ward || undefined,
           answer_question_id: answerQuestionId || undefined,
           answer_value: answerValue || undefined,
           sort_by: sortBy,
           sort_order: sortOrder,
+          ...listFilterParams,
         });
         if (cancelled) return;
         setRows(res.responses);
@@ -307,13 +360,12 @@ export function SurveyDataExplorer({
     debouncedSearch,
     lifecycle,
     status,
-    agentFilter,
     county,
-    ward,
     answerQuestionId,
     answerValue,
     sortBy,
     sortOrder,
+    listFilterParams,
   ]);
 
   const fetchData = useCallback(async () => {
@@ -327,13 +379,12 @@ export function SurveyDataExplorer({
         lifecycle_stage: lifecycle !== 'all' ? lifecycle : undefined,
         status: status !== 'all' ? status : undefined,
         survey_id: surveyId,
-        agent_id: agentFilter || undefined,
         county: county || undefined,
-        ward: ward || undefined,
         answer_question_id: answerQuestionId || undefined,
         answer_value: answerValue || undefined,
         sort_by: sortBy,
         sort_order: sortOrder,
+        ...listFilterParams,
       });
       setRows(res.responses);
       setPagination((p) => ({
@@ -355,13 +406,12 @@ export function SurveyDataExplorer({
     debouncedSearch,
     lifecycle,
     status,
-    agentFilter,
     county,
-    ward,
     answerQuestionId,
     answerValue,
     sortBy,
     sortOrder,
+    listFilterParams,
   ]);
 
   useEffect(() => {
@@ -379,8 +429,24 @@ export function SurveyDataExplorer({
   }, [selected?.id]);
 
   const counties = useMemo(() => facets?.counties || [], [facets]);
-  const wards = useMemo(() => facets?.wards || [], [facets]);
   const answerQuestion = facets?.filterable_questions.find((q) => q.id === answerQuestionId);
+
+  const applyListFilters = () => {
+    const snapshot = normalizeSurveyListFilters(draftFilters);
+    setDraftFilters(snapshot);
+    setAppliedFilters(snapshot);
+    setPagination((p) => ({ ...p, page: 1 }));
+    if (onAgentFilterChange) {
+      onAgentFilterChange(snapshot.agentIds.length === 1 ? snapshot.agentIds[0] : '');
+    }
+  };
+
+  const clearListFilters = () => {
+    setDraftFilters(EMPTY_SURVEY_LIST_FILTERS);
+    setAppliedFilters(EMPTY_SURVEY_LIST_FILTERS);
+    setPagination((p) => ({ ...p, page: 1 }));
+    onAgentFilterChange?.('');
+  };
 
   const SORTABLE_COLUMNS: Partial<Record<MetaColumnKey, string>> = {
     submitted: 'submitted_at',
@@ -585,240 +651,273 @@ export function SurveyDataExplorer({
   };
 
   const heightClass =
-    variant === 'full' ? 'h-[calc(100vh-7rem)] min-h-[480px]' : 'min-h-[420px] h-[calc(100vh-14rem)]';
+    variant === 'full' ? 'min-h-[520px]' : 'min-h-[480px]';
 
-  const showEmpty = !loading && pagination.total === 0 && !debouncedSearch && lifecycle === 'all' && status === 'all';
+  const showEmpty =
+    !loading &&
+    pagination.total === 0 &&
+    !debouncedSearch &&
+    lifecycle === 'all' &&
+    status === 'all' &&
+    !surveyListFiltersActive(appliedFilters);
 
   return (
-    <div className={`flex flex-col gap-3 ${heightClass}`}>
-      <div className="flex flex-wrap items-center gap-2 border border-border bg-card px-3 py-2">
-        <div className="flex min-w-[180px] flex-1 items-center gap-2 rounded-sm border border-input bg-background px-2 py-1.5">
-          <Search className="h-4 w-4 text-muted-foreground" />
-          <Input
-            className="h-8 border-0 bg-transparent px-0 shadow-none focus-visible:ring-0"
-            placeholder="Search this survey…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-        </div>
-        {agentOptions.length > 0 && onAgentFilterChange ? (
-          <div className="space-y-0">
-            <Label className="sr-only">Agent</Label>
-            <Select
-              value={agentFilter || 'all'}
-              onValueChange={(v) => onAgentFilterChange(v === 'all' ? '' : v)}
+    <div className={`flex flex-col gap-4 ${heightClass}`}>
+      <SurveyResultsFilterBar
+        draft={draftFilters}
+        onDraftChange={(next) => setDraftFilters((f) => ({ ...f, ...next }))}
+        onApply={applyListFilters}
+        onClear={clearListFilters}
+        applying={loading}
+        agents={localAgents}
+        facets={facets}
+        matchCount={loading ? null : pagination.total}
+        loading={loading}
+      />
+      <div className="space-y-4 border border-border bg-card px-4 py-4">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+          <div className="flex min-w-0 flex-1 items-center gap-2 rounded-sm border border-input bg-background px-3 py-2">
+            <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
+            <Input
+              className="h-8 border-0 bg-transparent px-0 shadow-none focus-visible:ring-0"
+              placeholder="Search this survey…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+          <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="h-10 rounded-sm px-3">
+                  <Columns3 className="mr-1.5 h-3.5 w-3.5" />
+                  Columns
+                  <ChevronDown className="ml-1.5 h-3.5 w-3.5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="max-h-[70vh] w-72 overflow-y-auto">
+                <DropdownMenuLabel>Meta</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {META_COLUMNS.map((c) => (
+                  <DropdownMenuCheckboxItem
+                    key={c.key}
+                    checked={visibleColumns.includes(c.key)}
+                    onCheckedChange={() => toggleCol(c.key)}
+                  >
+                    {c.label}
+                  </DropdownMenuCheckboxItem>
+                ))}
+                {questions.length > 0 ? (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuLabel>Survey questions</DropdownMenuLabel>
+                    {questions.map((q) => {
+                      const key = questionColumnKey(q.id);
+                      return (
+                        <DropdownMenuCheckboxItem
+                          key={key}
+                          checked={visibleColumns.includes(key)}
+                          onCheckedChange={() => toggleCol(key)}
+                        >
+                          <span className="line-clamp-2 text-left">{q.label}</span>
+                        </DropdownMenuCheckboxItem>
+                      );
+                    })}
+                  </>
+                ) : null}
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="h-10 rounded-sm px-3">
+                  <Save className="mr-1.5 h-3.5 w-3.5" />
+                  Views
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={saveCurrentView}>Save current view</DropdownMenuItem>
+                <DropdownMenuSeparator />
+                {surveyViews.length === 0 ? (
+                  <DropdownMenuItem disabled>No saved views</DropdownMenuItem>
+                ) : (
+                  surveyViews.map((v) => (
+                    <DropdownMenuItem key={v.id} onClick={() => applyView(v)}>
+                      {v.name}
+                    </DropdownMenuItem>
+                  ))
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-10 rounded-sm px-3"
+              onClick={() => void fetchData()}
+              disabled={loading}
             >
-              <SelectTrigger className="h-9 w-[160px] rounded-sm">
-                <SelectValue placeholder="Agent" />
+              <RefreshCw className={`mr-1.5 h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
+              Refresh
+            </Button>
+            <Button variant="outline" size="sm" className="h-10 rounded-sm px-3" onClick={exportSelected}>
+              <Download className="mr-1.5 h-3.5 w-3.5" />
+              Export
+            </Button>
+            {selectedIds.size > 0 ? (
+              <Button size="sm" className="h-10 rounded-sm px-3" onClick={() => void bulkApprove()}>
+                Approve {selectedIds.size}
+              </Button>
+            ) : null}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+          <div className="min-w-0 space-y-1.5">
+            <Label className="font-display text-xs uppercase tracking-wide">Stage</Label>
+            <Select value={lifecycle} onValueChange={setLifecycle}>
+              <SelectTrigger className="h-10 w-full rounded-sm">
+                <Filter className="mr-1.5 h-3.5 w-3.5 shrink-0" />
+                <SelectValue placeholder="Stage" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All agents</SelectItem>
-                {agentOptions.map((a) => (
-                  <SelectItem key={a.id} value={a.id}>
-                    {a.name}
+                <SelectItem value="all">All stages</SelectItem>
+                {LIFECYCLE_STAGES.map((s) => (
+                  <SelectItem key={s} value={s}>
+                    {LIFECYCLE_LABELS[s]}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
-        ) : null}
-        <Select value={lifecycle} onValueChange={setLifecycle}>
-          <SelectTrigger className="h-9 w-[150px] rounded-sm">
-            <Filter className="mr-1 h-3.5 w-3.5" />
-            <SelectValue placeholder="Stage" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All stages</SelectItem>
-            {LIFECYCLE_STAGES.map((s) => (
-              <SelectItem key={s} value={s}>
-                {LIFECYCLE_LABELS[s]}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select value={status} onValueChange={setStatus}>
-          <SelectTrigger className="h-9 w-[130px] rounded-sm">
-            <SelectValue placeholder="Status" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All status</SelectItem>
-            <SelectItem value="submitted">Submitted</SelectItem>
-            <SelectItem value="approved">Approved</SelectItem>
-            <SelectItem value="validated">Validated</SelectItem>
-            <SelectItem value="flagged">Flagged</SelectItem>
-            <SelectItem value="rejected">Rejected</SelectItem>
-          </SelectContent>
-        </Select>
-        <Select value={county || 'all'} onValueChange={(v) => { setCounty(v === 'all' ? '' : v); setWard(''); }}>
-          <SelectTrigger className="h-9 w-[130px] rounded-sm">
-            <SelectValue placeholder="County" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All counties</SelectItem>
-            {counties.map((c) => (
-              <SelectItem key={c} value={c}>
-                {c}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select value={ward || 'all'} onValueChange={(v) => setWard(v === 'all' ? '' : v)}>
-          <SelectTrigger className="h-9 w-[120px] rounded-sm">
-            <SelectValue placeholder="Ward" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All wards</SelectItem>
-            {wards.map((w) => (
-              <SelectItem key={w} value={w}>
-                {w}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select
-          value={answerQuestionId || 'none'}
-          onValueChange={(v) => {
-            setAnswerQuestionId(v === 'none' ? '' : v);
-            setAnswerValue('');
-          }}
-        >
-          <SelectTrigger className="h-9 w-[160px] rounded-sm">
-            <SelectValue placeholder="Answer filter" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="none">Any answer</SelectItem>
-            {(facets?.filterable_questions || []).map((q) => (
-              <SelectItem key={q.id} value={q.id}>
-                {q.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+          <div className="min-w-0 space-y-1.5">
+            <Label className="font-display text-xs uppercase tracking-wide">Status</Label>
+            <Select value={status} onValueChange={setStatus}>
+              <SelectTrigger className="h-10 w-full rounded-sm">
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All status</SelectItem>
+                <SelectItem value="submitted">Submitted</SelectItem>
+                <SelectItem value="approved">Approved</SelectItem>
+                <SelectItem value="validated">Validated</SelectItem>
+                <SelectItem value="flagged">Flagged</SelectItem>
+                <SelectItem value="rejected">Rejected</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="min-w-0 space-y-1.5">
+            <Label className="font-display text-xs uppercase tracking-wide">County</Label>
+            <Select value={county || 'all'} onValueChange={(v) => setCounty(v === 'all' ? '' : v)}>
+              <SelectTrigger className="h-10 w-full rounded-sm">
+                <SelectValue placeholder="County" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All counties</SelectItem>
+                {counties.map((c) => (
+                  <SelectItem key={c} value={c}>
+                    {c}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="min-w-0 space-y-1.5">
+            <Label className="font-display text-xs uppercase tracking-wide">Answer</Label>
+            <Select
+              value={answerQuestionId || 'none'}
+              onValueChange={(v) => {
+                setAnswerQuestionId(v === 'none' ? '' : v);
+                setAnswerValue('');
+              }}
+            >
+              <SelectTrigger className="h-10 w-full rounded-sm">
+                <SelectValue placeholder="Answer filter" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">Any answer</SelectItem>
+                {(facets?.filterable_questions || []).map((q) => (
+                  <SelectItem key={q.id} value={q.id}>
+                    {q.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          {answerQuestion ? (
+            <div className="min-w-0 space-y-1.5">
+              <Label className="font-display text-xs uppercase tracking-wide">Value</Label>
+              <Select value={answerValue || 'all'} onValueChange={(v) => setAnswerValue(v === 'all' ? '' : v)}>
+                <SelectTrigger className="h-10 w-full rounded-sm">
+                  <SelectValue placeholder="Value" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Any value</SelectItem>
+                  {answerQuestion.options.map((opt) => (
+                    <SelectItem key={opt} value={opt}>
+                      {opt}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          ) : (
+            <div className="min-w-0 space-y-1.5">
+              <Label className="font-display text-xs uppercase tracking-wide">Group</Label>
+              <Select value={groupBy} onValueChange={setGroupBy}>
+                <SelectTrigger className="h-10 w-full rounded-sm">
+                  <Group className="mr-1.5 h-3.5 w-3.5 shrink-0" />
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No grouping</SelectItem>
+                  <SelectItem value="county">County</SelectItem>
+                  <SelectItem value="ward">Ward</SelectItem>
+                  <SelectItem value="agent">Agent</SelectItem>
+                  <SelectItem value="lifecycle">Stage</SelectItem>
+                  <SelectItem value="status">Status</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+        </div>
         {answerQuestion ? (
-          <Select value={answerValue || 'all'} onValueChange={(v) => setAnswerValue(v === 'all' ? '' : v)}>
-            <SelectTrigger className="h-9 w-[130px] rounded-sm">
-              <SelectValue placeholder="Value" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Any value</SelectItem>
-              {answerQuestion.options.map((opt) => (
-                <SelectItem key={opt} value={opt}>
-                  {opt}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        ) : null}
-        <Select value={groupBy} onValueChange={setGroupBy}>
-          <SelectTrigger className="h-9 w-[120px] rounded-sm">
-            <Group className="mr-1 h-3.5 w-3.5" />
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="none">No grouping</SelectItem>
-            <SelectItem value="county">County</SelectItem>
-            <SelectItem value="ward">Ward</SelectItem>
-            <SelectItem value="agent">Agent</SelectItem>
-            <SelectItem value="lifecycle">Stage</SelectItem>
-            <SelectItem value="status">Status</SelectItem>
-          </SelectContent>
-        </Select>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="sm" className="h-9 rounded-sm">
-              <Columns3 className="mr-1 h-3.5 w-3.5" />
-              Columns
-              <ChevronDown className="ml-1 h-3.5 w-3.5" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="max-h-[70vh] w-72 overflow-y-auto">
-            <DropdownMenuLabel>Meta</DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            {META_COLUMNS.map((c) => (
-              <DropdownMenuCheckboxItem
-                key={c.key}
-                checked={visibleColumns.includes(c.key)}
-                onCheckedChange={() => toggleCol(c.key)}
-              >
-                {c.label}
-              </DropdownMenuCheckboxItem>
-            ))}
-            {questions.length > 0 ? (
-              <>
-                <DropdownMenuSeparator />
-                <DropdownMenuLabel>Survey questions</DropdownMenuLabel>
-                {questions.map((q) => {
-                  const key = questionColumnKey(q.id);
-                  return (
-                    <DropdownMenuCheckboxItem
-                      key={key}
-                      checked={visibleColumns.includes(key)}
-                      onCheckedChange={() => toggleCol(key)}
-                    >
-                      <span className="line-clamp-2 text-left">{q.label}</span>
-                    </DropdownMenuCheckboxItem>
-                  );
-                })}
-              </>
-            ) : null}
-          </DropdownMenuContent>
-        </DropdownMenu>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="sm" className="h-9 rounded-sm">
-              <Save className="mr-1 h-3.5 w-3.5" />
-              Views
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={saveCurrentView}>Save current view</DropdownMenuItem>
-            <DropdownMenuSeparator />
-            {surveyViews.length === 0 ? (
-              <DropdownMenuItem disabled>No saved views</DropdownMenuItem>
-            ) : (
-              surveyViews.map((v) => (
-                <DropdownMenuItem key={v.id} onClick={() => applyView(v)}>
-                  {v.name}
-                </DropdownMenuItem>
-              ))
-            )}
-          </DropdownMenuContent>
-        </DropdownMenu>
-        <Button
-          variant="outline"
-          size="sm"
-          className="h-9 rounded-sm"
-          onClick={() => void fetchData()}
-          disabled={loading}
-        >
-          <RefreshCw className={`mr-1 h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
-          Refresh
-        </Button>
-        <Button variant="outline" size="sm" className="h-9 rounded-sm" onClick={exportSelected}>
-          <Download className="mr-1 h-3.5 w-3.5" />
-          Export
-        </Button>
-        {selectedIds.size > 0 ? (
-          <Button size="sm" className="h-9 rounded-sm" onClick={() => void bulkApprove()}>
-            Approve {selectedIds.size}
-          </Button>
+          <div className="max-w-xs space-y-1.5">
+            <Label className="font-display text-xs uppercase tracking-wide">Group</Label>
+            <Select value={groupBy} onValueChange={setGroupBy}>
+              <SelectTrigger className="h-10 w-full rounded-sm">
+                <Group className="mr-1.5 h-3.5 w-3.5 shrink-0" />
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">No grouping</SelectItem>
+                <SelectItem value="county">County</SelectItem>
+                <SelectItem value="ward">Ward</SelectItem>
+                <SelectItem value="agent">Agent</SelectItem>
+                <SelectItem value="lifecycle">Stage</SelectItem>
+                <SelectItem value="status">Status</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         ) : null}
       </div>
 
       {showEmpty && emptyState ? (
         emptyState
       ) : (
-        <div className="flex min-h-0 flex-1 overflow-hidden border border-border bg-card">
+        <div className="flex min-h-[28rem] flex-1 overflow-hidden border border-border bg-card">
           <div className={`flex min-w-0 flex-col ${selected ? 'w-[58%]' : 'w-full'}`}>
-            <div className="border-b border-border px-3 py-1.5 text-xs text-muted-foreground">
+            <div className="border-b border-border px-4 py-2.5 text-xs leading-relaxed text-muted-foreground">
               {loading ? 'Loading…' : (
                 <>
                   <span className="ledger-count">{pagination.total}</span> submission
-                  {pagination.total === 1 ? '' : 's'}
+                  {pagination.total === 1 ? '' : 's'} matching filters
                   {surveyTitle ? ` · ${surveyTitle}` : ''}
-                  {agentFilter
-                    ? ` · ${agentOptions.find((a) => a.id === agentFilter)?.name || 'Agent filter'}`
+                  {' · Kenya time (EAT)'}
+                  {appliedFilters.agentIds.length
+                    ? ` · ${appliedFilters.agentIds
+                        .map((id) => localAgents.find((a) => a.id === id)?.name || id.slice(0, 8))
+                        .join(', ')}`
                     : ''}
+                  {appliedFilters.ward ? ` · ${appliedFilters.ward}` : ''}
+                  {appliedFilters.village ? ` · ${appliedFilters.village}` : ''}
                 </>
               )}
             </div>
@@ -853,7 +952,7 @@ export function SurveyDataExplorer({
                             return (
                             <th
                               key={c.key}
-                              className={`max-w-[200px] whitespace-normal text-left text-xs leading-snug ${sortField ? 'cursor-pointer' : ''}`}
+                              className={`max-w-[240px] whitespace-normal px-3 py-3 text-left text-xs leading-snug ${sortField ? 'cursor-pointer select-none hover:text-foreground' : ''}`}
                               title={c.label}
                               onClick={() => {
                                 if (!sortField) return;
@@ -865,8 +964,16 @@ export function SurveyDataExplorer({
                                 }
                               }}
                             >
-                              <span className="line-clamp-3">{c.label}</span>
-                              {isSorted ? (sortOrder === 'desc' ? ' ↓' : ' ↑') : ''}
+                              <span className="inline-flex items-start gap-1.5">
+                                <span className="line-clamp-3">{c.label}</span>
+                                {isSorted ? (
+                                  sortOrder === 'desc' ? (
+                                    <ArrowDown className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                                  ) : (
+                                    <ArrowUp className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                                  )
+                                ) : null}
+                              </span>
                             </th>
                           );})}
                         </tr>
@@ -900,7 +1007,7 @@ export function SurveyDataExplorer({
                 ))
               )}
             </div>
-            <div className="border-t border-border px-2 py-2">
+            <div className="border-t border-border px-4 py-3">
               <TablePagination
                 page={pagination.page}
                 pageSize={pagination.per_page}

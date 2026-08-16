@@ -89,10 +89,14 @@ export async function buildFullResearchReportData(
     agent_id?: string;
     county?: string;
     ward?: string;
+    village?: string;
     status?: string;
     lifecycle_stage?: string;
     answer_question_id?: string;
     answer_value?: string;
+    date_preset?: string;
+    date_from?: string;
+    date_to?: string;
   },
 ) {
   const rowsPromise = fetchAllSurveyResponses(surveyId, filters);
@@ -103,10 +107,14 @@ export async function buildFullResearchReportData(
       agent_id: filters?.agent_id,
       county: filters?.county,
       ward: filters?.ward,
+      village: filters?.village,
       status: filters?.status,
       lifecycle_stage: filters?.lifecycle_stage,
       answer_question_id: filters?.answer_question_id,
       answer_value: filters?.answer_value,
+      date_preset: filters?.date_preset,
+      date_from: filters?.date_from,
+      date_to: filters?.date_to,
     })) as SurveyAnalyticsPayload;
   } catch {
     api = null;

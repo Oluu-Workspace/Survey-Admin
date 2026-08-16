@@ -1,5 +1,6 @@
 import type { SurveyQuestion } from './questions';
 import { downloadText, openHtmlInNewTabOrDownload, type OpenHtmlReportResult } from './download';
+import { isTodayEAT } from './datetime';
 import {
   AGE_BANDS,
   ageBand,
@@ -60,10 +61,7 @@ export function analyticsBundle(
 ) {
   const excluded = responses.filter(isExcluded);
   const included = responses.filter((r) => !isExcluded(r));
-  const today = new Date().toDateString();
-  const todayCount = included.filter(
-    (r) => new Date(r.created_at || r.submitted_at || 0).toDateString() === today,
-  ).length;
+  const todayCount = included.filter((r) => isTodayEAT(r.created_at || r.submitted_at)).length;
 
   const approved = included.filter((r) =>
     ['approved', 'validated', 'submitted'].includes((r.status || 'submitted').toLowerCase()),
@@ -368,6 +366,7 @@ export function openPrintableReport(opts: {
   totalResponsesFetched?: number;
   analyticsFromApi?: boolean;
   filterSummary?: string;
+  reportPeriod?: { title: string; value: string };
 }): OpenHtmlReportResult {
   const {
     surveyTitle,
@@ -385,6 +384,7 @@ export function openPrintableReport(opts: {
     totalResponsesFetched,
     analyticsFromApi: _analyticsFromApi,
     filterSummary,
+    reportPeriod,
   } = opts;
   void _analyticsFromApi;
   const logoSrc =
@@ -809,6 +809,14 @@ export function openPrintableReport(opts: {
     ? `<p class="note"><strong>Filters applied:</strong> ${escapeHtml(filterSummary)}. Charts reflect this subset only.</p>`
     : '<p class="note">Full analysis — every survey question with available breakdowns, charts, and tables.</p>';
 
+  const periodBlock = reportPeriod
+    ? `<div class="report-scope"><div class="report-date-line"><strong>${escapeHtml(reportPeriod.title)}:</strong> ${escapeHtml(reportPeriod.value)}</div>${
+        filterSummary
+          ? `<div class="report-filter-line">${escapeHtml(filterSummary)}</div>`
+          : ''
+      }</div>`
+    : '';
+
   pages.push({
     title: 'Cover & summary',
     body: `
@@ -817,6 +825,7 @@ export function openPrintableReport(opts: {
         <h1>${reportTitle}</h1>
         ${surveySubtitle ? `<p class="sub">${escapeHtml(surveySubtitle)}</p>` : ''}
         <div class="meta">${reportArea} · Generated ${reportDate}</div>
+        ${periodBlock}
         <div class="tagline powered-by">
           <span>Powered by</span>
           <img src="${logoSrc}" alt="Strategic Insight" class="powered-logo" />
@@ -979,6 +988,9 @@ export function openPrintableReport(opts: {
   .cover h1 { font-family: "Instrument Sans", sans-serif; font-size: 24px; margin: 0 0 6px; font-weight: 700; }
   .cover .sub { opacity: 0.92; font-size: 12px; max-width: 70em; }
   .cover .meta { color: rgba(255,255,255,0.85); font-size: 11px; margin-top: 10px; }
+  .cover .report-scope { margin-top: 10px; padding: 8px 10px; background: rgba(0,0,0,0.18); border-radius: 2px; }
+  .cover .report-date-line { font-size: 13px; font-weight: 600; }
+  .cover .report-filter-line { font-size: 11px; opacity: 0.92; margin-top: 4px; }
   .cover .tagline.powered-by { margin-top: 12px; display: flex; align-items: center; gap: 8px; font-size: 11px; opacity: 0.95; }
   .cover .powered-logo { height: 28px; width: auto; max-width: 160px; object-fit: contain; background: #000; padding: 4px 8px; border-radius: 2px; }
   .powered-by-inline { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
