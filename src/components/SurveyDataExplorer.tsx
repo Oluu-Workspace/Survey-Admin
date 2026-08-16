@@ -110,6 +110,14 @@ function questionIdFromColumn(key: `q:${string}`): string {
   return key.slice(2);
 }
 
+function columnWidth(key: ColumnKey): number {
+  if (isQuestionColumn(key)) return 220;
+  if (key === 'submitted' || key === 'id') return 168;
+  if (key === 'agent' || key === 'ward' || key === 'village' || key === 'respondent') return 148;
+  if (key === 'phone' || key === 'project' || key === 'subcounty') return 136;
+  return 112;
+}
+
 function formatAnswerCell(v: unknown): string {
   if (v === undefined || v === null || v === '') return '—';
   if (Array.isArray(v)) return v.length ? v.map(String).join(', ') : '—';
@@ -571,7 +579,7 @@ export function SurveyDataExplorer({
         (qid === 'lari_mobile' && flags.includes('fake_phone'));
       return (
         <span
-          className={`block max-w-[220px] truncate ${suspicious ? 'font-medium text-destructive' : ''}`}
+          className={`block truncate ${suspicious ? 'font-medium text-destructive' : ''}`}
           title={
             suspicious
               ? `${text} — flagged (${flags.filter((f) => f.includes(qid) || f === 'fake_phone').join(', ')})`
@@ -938,10 +946,22 @@ export function SurveyDataExplorer({
                         {group.key} ({group.items.length})
                       </div>
                     ) : null}
-                    <table className="ledger-table w-full min-w-max">
-                      <thead className="sticky top-0 z-[5] bg-card shadow-sm">
+                    <table
+                      className="ledger-table ledger-table-fixed"
+                      style={{
+                        tableLayout: 'fixed',
+                        width: 48 + activeColumns.reduce((sum, c) => sum + columnWidth(c.key), 0),
+                      }}
+                    >
+                      <colgroup>
+                        <col style={{ width: 48 }} />
+                        {activeColumns.map((c) => (
+                          <col key={c.key} style={{ width: columnWidth(c.key) }} />
+                        ))}
+                      </colgroup>
+                      <thead className="sticky top-0 z-[5] bg-card">
                         <tr>
-                          <th className="sticky left-0 z-[6] w-10 bg-card">
+                          <th className="sticky left-0 z-[6] bg-card">
                             <span className="sr-only">Select</span>
                           </th>
                           {activeColumns.map((c) => {
@@ -952,7 +972,7 @@ export function SurveyDataExplorer({
                             return (
                             <th
                               key={c.key}
-                              className={`max-w-[240px] whitespace-normal px-3 py-3 text-left text-xs leading-snug ${sortField ? 'cursor-pointer select-none hover:text-foreground' : ''}`}
+                              className={sortField ? 'cursor-pointer select-none hover:text-foreground' : ''}
                               title={c.label}
                               onClick={() => {
                                 if (!sortField) return;
@@ -964,13 +984,13 @@ export function SurveyDataExplorer({
                                 }
                               }}
                             >
-                              <span className="inline-flex items-start gap-1.5">
-                                <span className="line-clamp-3">{c.label}</span>
+                              <span className="flex items-center gap-1.5">
+                                <span className="truncate">{c.label}</span>
                                 {isSorted ? (
                                   sortOrder === 'desc' ? (
-                                    <ArrowDown className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                                    <ArrowDown className="h-3.5 w-3.5 shrink-0" />
                                   ) : (
-                                    <ArrowUp className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                                    <ArrowUp className="h-3.5 w-3.5 shrink-0" />
                                   )
                                 ) : null}
                               </span>
@@ -995,8 +1015,8 @@ export function SurveyDataExplorer({
                               />
                             </td>
                             {activeColumns.map((c) => (
-                              <td key={c.key} className="align-top text-sm">
-                                {renderCell(r, c.key)}
+                              <td key={c.key}>
+                                <div className="min-w-0 truncate">{renderCell(r, c.key)}</div>
                               </td>
                             ))}
                           </tr>

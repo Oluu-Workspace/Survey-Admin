@@ -248,16 +248,22 @@ export function CollectionHoursAdminCard() {
                 type="date"
                 className="h-9 w-[150px] rounded-sm"
                 value={untilDate}
-                onChange={(e) => setUntilDate(e.target.value)}
+                onChange={(e) => {
+                  if (e.target.value) setUntilDate(e.target.value);
+                }}
               />
             </div>
             <div className="space-y-1">
               <Label className="font-display text-xs uppercase tracking-wide">Time</Label>
               <Input
                 type="time"
+                step={60}
                 className="h-9 w-[120px] rounded-sm"
                 value={untilTime}
-                onChange={(e) => setUntilTime(e.target.value)}
+                onChange={(e) => {
+                  const next = e.target.value.slice(0, 5);
+                  if (next) setUntilTime(next);
+                }}
               />
             </div>
           </>

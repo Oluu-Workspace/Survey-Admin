@@ -32,13 +32,16 @@ type Props = {
 
 export function KenyaDateRangePicker({ dateFrom, dateTo, onChange, disabled }: Props) {
   const [open, setOpen] = useState(false);
-  const year = Number(todayEAT().slice(0, 4));
+  const kenyaToday = useMemo(() => isoToCalendarDate(todayEAT()) ?? new Date(), []);
+  const year = kenyaToday.getFullYear();
   const selected = useMemo<DateRange | undefined>(() => {
     const from = dateFrom ? isoToCalendarDate(dateFrom) : undefined;
     const to = dateTo ? isoToCalendarDate(dateTo) : undefined;
     if (!from) return undefined;
     return { from, to };
   }, [dateFrom, dateTo]);
+
+  const [month, setMonth] = useState<Date>(() => selected?.from ?? kenyaToday);
 
   const summary = useMemo(() => {
     if (dateFrom && dateTo) return formatKenyaDateRange(dateFrom, dateTo);
@@ -55,10 +58,9 @@ export function KenyaDateRangePicker({ dateFrom, dateTo, onChange, disabled }: P
   };
 
   const applyRange = (range: DateRange | undefined) => {
-    if (!range?.from) {
-      emit('', '', '');
-      return;
-    }
+    // DayPicker fires undefined while re-rendering a controlled range. Keep the
+    // current Kenya dates instead of wiping them back to empty.
+    if (!range?.from) return;
     const from = calendarDateToIso(range.from);
     const to = range.to ? calendarDateToIso(range.to) : '';
     emit(from, to, 'custom');
@@ -68,11 +70,21 @@ export function KenyaDateRangePicker({ dateFrom, dateTo, onChange, disabled }: P
     const named = rangeForPreset(preset);
     if (!named) return;
     emit(named.from, named.to, preset);
+    const start = isoToCalendarDate(named.from);
+    if (start) setMonth(start);
   };
 
   const useStartDayOnly = () => {
     if (!dateFrom) return;
     emit(dateFrom, dateFrom, 'custom');
+  };
+
+  const onTypedDate = (which: 'from' | 'to', value: string) => {
+    if (!value) return;
+    if (which === 'from') emit(value, dateTo || value, 'custom');
+    else emit(dateFrom || value, value, 'custom');
+    const d = isoToCalendarDate(value);
+    if (d) setMonth(d);
   };
 
   return (
@@ -90,7 +102,13 @@ export function KenyaDateRangePicker({ dateFrom, dateTo, onChange, disabled }: P
             <span className="truncate">{summary}</span>
           </Button>
         </PopoverTrigger>
-        <PopoverContent align="start" className="w-[min(100vw-2rem,320px)] rounded-sm p-4" collisionPadding={16}>
+        <PopoverContent
+          align="start"
+          className="w-[min(100vw-2rem,320px)] rounded-sm p-4"
+          collisionPadding={16}
+          onOpenAutoFocus={(e) => e.preventDefault()}
+          onCloseAutoFocus={(e) => e.preventDefault()}
+        >
           <div className="mb-3 flex flex-wrap gap-2">
             {PRESETS.map((p) => (
               <Button
@@ -109,8 +127,9 @@ export function KenyaDateRangePicker({ dateFrom, dateTo, onChange, disabled }: P
             mode="range"
             selected={selected}
             onSelect={applyRange}
-            defaultMonth={selected?.from || isoToCalendarDate(todayEAT())}
-            today={isoToCalendarDate(todayEAT())}
+            month={month}
+            onMonthChange={setMonth}
+            today={kenyaToday}
             captionLayout="dropdown-buttons"
             fromYear={year - 8}
             toYear={year + 1}
@@ -123,7 +142,7 @@ export function KenyaDateRangePicker({ dateFrom, dateTo, onChange, disabled }: P
                 type="date"
                 className="h-9 rounded-sm text-sm"
                 value={dateFrom}
-                onChange={(e) => emit(e.target.value, dateTo || e.target.value, 'custom')}
+                onChange={(e) => onTypedDate('from', e.target.value)}
               />
             </div>
             <div className="space-y-1.5">
@@ -133,7 +152,7 @@ export function KenyaDateRangePicker({ dateFrom, dateTo, onChange, disabled }: P
                 className="h-9 rounded-sm text-sm"
                 value={dateTo}
                 min={dateFrom || undefined}
-                onChange={(e) => emit(dateFrom || e.target.value, e.target.value, 'custom')}
+                onChange={(e) => onTypedDate('to', e.target.value)}
               />
             </div>
           </div>
