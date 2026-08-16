@@ -21,15 +21,22 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// 401 on a protected call = session expired. Do not treat public settings 401/404 as logout.
+// 401 on a protected call = session expired. Auth probes and public settings
+// are handled by the caller so a refresh does not wipe a still-valid session.
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const status = error.response?.status;
     const url = String(error.config?.url || '');
     const isPublicSettings = url.includes('/settings/collection-hours');
-    if (status === 401 && !isPublicSettings) {
+    const isAuthProbe =
+      url.includes('/auth/profile') ||
+      url.includes('/auth/me') ||
+      url.includes('/auth/login') ||
+      url.includes('/auth/refresh');
+    if (status === 401 && !isPublicSettings && !isAuthProbe) {
       localStorage.removeItem('auth_token');
+      localStorage.removeItem('auth_user');
       if (!window.location.pathname.startsWith('/login')) {
         window.location.href = '/login';
       }
@@ -60,7 +67,11 @@ export const authAPI = {
   
   me: async (): Promise<User> => {
     const { data } = await api.get('/auth/profile');
-    return data;
+    const user = (data?.user ?? data) as User;
+    if (!user?.id) {
+      throw new Error('Invalid profile response');
+    }
+    return user;
   },
   
   logout: async (): Promise<void> => {

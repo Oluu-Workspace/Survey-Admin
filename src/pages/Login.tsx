@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { Navigate, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/store/authStore';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,11 +13,29 @@ import { useTheme } from '@/hooks/use-theme';
 
 const Login = () => {
   const navigate = useNavigate();
-  const { login, isLoading } = useAuthStore();
+  const { login, isLoading, token, user, checkAuth } = useAuthStore();
   const { theme, setTheme } = useTheme();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showConnectionTest, setShowConnectionTest] = useState(false);
+
+  useEffect(() => {
+    if (token && !user) {
+      void checkAuth();
+    }
+  }, [token, user, checkAuth]);
+
+  if (token && user) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  if (token && isLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <Loader2 className="h-6 w-6 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
