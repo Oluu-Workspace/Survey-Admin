@@ -557,7 +557,7 @@ export function openPrintableReport(opts: {
     return `<section class="mini-chart">
       <h3>${escapeHtml(title)}</h3>
       <div class="pie-card">
-        ${pieSvg(data, 140, donut ? 0.52 : 0)}
+        ${pieSvg(data, 170, donut ? 0.52 : 0)}
         <div class="legend">${chartLegend(data)}</div>
       </div>
     </section>`;
@@ -574,22 +574,12 @@ export function openPrintableReport(opts: {
     return `
       <div class="chart-row">
         <div class="chart-panel">
-          <div class="chart-title">Pie chart — share (%)</div>
-          <div class="pie-card">${pieSvg(pieData, 160, 0)}<div class="legend">${chartLegend(pieData)}</div></div>
+          <div class="chart-title">Distribution — share (%)</div>
+          <div class="pie-card">${pieSvg(pieData, 150, 0.52)}<div class="legend">${chartLegend(pieData)}</div></div>
         </div>
-        <div class="chart-panel">
-          <div class="chart-title">Donut chart — share (%)</div>
-          <div class="pie-card">${pieSvg(pieData, 160, 0.55)}<div class="legend">${chartLegend(pieData)}</div></div>
-        </div>
-      </div>
-      <div class="chart-row">
         <div class="chart-panel">
           <div class="chart-title">Bar chart — counts</div>
           ${columnChart(sorted, 'count')}
-        </div>
-        <div class="chart-panel">
-          <div class="chart-title">Bar chart — percentages (%)</div>
-          ${columnChart(sorted, 'pct')}
         </div>
       </div>
       <div class="chart-title" style="margin-top:10px">Data table (sorted by count)</div>
@@ -854,24 +844,21 @@ export function openPrintableReport(opts: {
   pages.push({
     title: 'Overview charts',
     body: `
-      <h2>Overview — geographic &amp; team distribution</h2>
-      <p class="meta">Pie and donut charts for where data was collected and who collected it.</p>
+      <h2>Geographic distribution</h2>
+      <p class="meta">Where data was collected — ward and village breakdown.</p>
       <div class="pie-grid">
-        ${pieCard('Submissions by ward', wardDist, false)}
-        ${pieCard('Submissions by ward (donut)', wardDist, true)}
-        ${pieCard('Submissions by village', villageDist, false)}
-        ${pieCard('Submissions by village (donut)', villageDist, true)}
+        ${pieCard('Submissions by ward', wardDist, true)}
+        ${pieCard('Submissions by village', villageDist, true)}
       </div>
+      <h2>Team &amp; status</h2>
       <div class="pie-grid">
-        ${statusDist.length ? pieCard('Review status', statusDist, false) : ''}
-        ${statusDist.length ? pieCard('Review status (donut)', statusDist, true) : ''}
-        ${pieCard('Field agents', agentDist, false)}
-        ${pieCard('Field agents (donut)', agentDist, true)}
+        ${statusDist.length ? pieCard('Review status', statusDist, true) : ''}
+        ${pieCard('Field agents', agentDist, true)}
       </div>
       ${trendHtml}`,
   });
 
-  const qChunks = chunk(questionBlocks, 1);
+  const qChunks = chunk(questionBlocks, 2);
   qChunks.forEach((parts, i) => {
     if (!parts.length) return;
     pages.push({
@@ -953,15 +940,15 @@ export function openPrintableReport(opts: {
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Instrument+Sans:wght@500;600;700&family=Source+Sans+3:wght@400;600&display=swap" rel="stylesheet"/>
 <style>
   @page {
-    size: A4 landscape;
+    size: A4 portrait;
     margin: 0;
   }
   * { box-sizing: border-box; }
-  body { font-family: "Source Sans 3", system-ui, sans-serif; color: #1A2838; font-size: 11px; line-height: 1.35; width: 100%; max-width: none; margin: 0; padding: 0; background: #fff; }
+  body { font-family: "Source Sans 3", system-ui, sans-serif; color: #1A2838; font-size: 11px; line-height: 1.4; width: 100%; max-width: none; margin: 0; padding: 0; background: #fff; }
   .report-page {
     background: #fff;
     border: 0;
-    padding: 6mm 7mm 5mm;
+    padding: 8mm 10mm 6mm;
     margin: 0;
     width: 100%;
     page-break-after: always;
@@ -1033,7 +1020,7 @@ export function openPrintableReport(opts: {
   .chart-row { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin: 6px 0; break-inside: avoid; }
   .chart-panel { min-width: 0; border: 1px solid #E8EDF2; padding: 6px; background: #fafbfc; }
   .chart-col { min-width: 0; }
-  .pie-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin: 6px 0 8px; }
+  .pie-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 8px 0 10px; }
   .mini-chart { border: 1px solid #D3DAE3; padding: 6px; break-inside: avoid; }
   .mini-chart h3 { font-size: 11px; margin: 0 0 8px; }
   .pie-card { display: flex; align-items: flex-start; gap: 12px; }
@@ -1049,7 +1036,7 @@ export function openPrintableReport(opts: {
     .noprint { display: none !important; }
     body { padding: 0; margin: 0; width: 100%; max-width: none; background: #fff; }
     .report-page {
-      border: 0; margin: 0; padding: 6mm 7mm 5mm;
+      border: 0; margin: 0; padding: 8mm 10mm 6mm;
       page-break-after: always; break-after: page;
     }
     .report-page:last-of-type { page-break-after: auto; break-after: auto; }
@@ -1058,7 +1045,7 @@ export function openPrintableReport(opts: {
   }
 </style></head><body>
   <div class="toolbar noprint">
-    <button onclick="window.print()" style="padding:10px 16px;background:#1B4D3E;color:#fff;border:0;cursor:pointer;border-radius:4px;font-size:12px">Print / Save as PDF (landscape)</button>
+    <button onclick="window.print()" style="padding:10px 16px;background:#1B4D3E;color:#fff;border:0;cursor:pointer;border-radius:4px;font-size:12px">Print / Save as PDF</button>
     <span style="margin-left:12px;font-size:12px;color:#5A6B7D">${totalPages} pages · ${reportDate}</span>
   </div>
   ${pagesHtml}
@@ -1071,6 +1058,337 @@ export function openPrintableReport(opts: {
   return openHtmlInNewTabOrDownload(html, `${safeName}_research_report`);
 }
 
+
+/**
+ * Build a single combined PDF with one section per ward.
+ * Uses only client-side data — no extra API calls.
+ */
+export function openMultiWardReport(opts: {
+  surveyTitle: string;
+  surveySubtitle?: string;
+  generatedAt: string;
+  questions: SurveyQuestion[];
+  allResponses: ResponseLike[];
+  agentName: (id: string) => string;
+  questionInsights?: Record<string, string>;
+}): OpenHtmlReportResult {
+  const { surveyTitle, surveySubtitle, generatedAt, questions, allResponses, agentName, questionInsights } = opts;
+  const logoSrc =
+    typeof window !== 'undefined'
+      ? `${window.location.origin}/strategic-insight-logo.png`
+      : '/strategic-insight-logo.png';
+
+  // Collect unique wards (excluding unknown)
+  const wardCounts: Record<string, number> = {};
+  for (const r of allResponses) {
+    const w = (r.location?.ward || '').trim();
+    if (w && !/^unknown/i.test(w)) wardCounts[w] = (wardCounts[w] || 0) + 1;
+  }
+  const wards = Object.entries(wardCounts)
+    .sort((a, b) => b[1] - a[1])
+    .map(([w]) => w);
+
+  if (!wards.length) {
+    return openHtmlInNewTabOrDownload(
+      `<html><body><p>No ward data found.</p></body></html>`,
+      `${surveyTitle}_ward_report`,
+    );
+  }
+
+  const reportTitle = escapeHtml(surveyTitle);
+  const reportDate = escapeHtml(generatedAt);
+
+  // --- shared helpers (duplicated from openPrintableReport for self-containment) ---
+  const palette = ['#1B4D3E', '#3D6B5C', '#A67C52', '#2C4A6E', '#8B3A2F', '#5A6B7D', '#6B8F71', '#2C3E50'];
+
+  const topN = (
+    items: { option: string; count: number; pct: number }[],
+    n = 8,
+  ): { option: string; count: number; pct: number }[] => {
+    const sorted = [...items].sort((a, b) => b.count - a.count);
+    if (sorted.length <= n) return sorted;
+    const head = sorted.slice(0, n);
+    const rest = sorted.slice(n);
+    const otherCount = rest.reduce((s, i) => s + i.count, 0);
+    const total = sorted.reduce((s, i) => s + i.count, 0) || 1;
+    return [...head, { option: 'Other', count: otherCount, pct: Math.round((otherCount / total) * 100) }];
+  };
+
+  const pieSvgW = (
+    items: { option: string; count: number; pct: number }[],
+    size = 150,
+    innerRatio = 0.52,
+  ) => {
+    if (!items.length) return '<p class="meta">No data</p>';
+    const total = items.reduce((sum, item) => sum + item.count, 0) || 1;
+    const cx = size / 2; const cy = size / 2; const r = size / 2 - 6; const ri = r * innerRatio;
+    let angle = -Math.PI / 2;
+    const slices = items.map((item, index) => {
+      const slice = (item.count / total) * Math.PI * 2;
+      const x1 = cx + r * Math.cos(angle); const y1 = cy + r * Math.sin(angle);
+      const x2 = cx + r * Math.cos(angle + slice); const y2 = cy + r * Math.sin(angle + slice);
+      const large = slice > Math.PI ? 1 : 0;
+      const fill = palette[index % palette.length];
+      const ix1 = cx + ri * Math.cos(angle); const iy1 = cy + ri * Math.sin(angle);
+      const ix2 = cx + ri * Math.cos(angle + slice); const iy2 = cy + ri * Math.sin(angle + slice);
+      const path = `M ${x1} ${y1} A ${r} ${r} 0 ${large} 1 ${x2} ${y2} L ${ix2} ${iy2} A ${ri} ${ri} 0 ${large} 0 ${ix1} ${iy1} Z`;
+      angle += slice;
+      return `<path d="${path}" fill="${fill}" stroke="#fff" stroke-width="1"/>`;
+    });
+    const center = `<text x="${cx}" y="${cy - 2}" text-anchor="middle" font-size="13" font-weight="600" fill="#1A2838">${total}</text><text x="${cx}" y="${cy + 10}" text-anchor="middle" font-size="8" fill="#5A6B7D">answers</text>`;
+    return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" role="img">${slices.join('')}${center}</svg>`;
+  };
+
+  const legendW = (items: { option: string; count: number; pct: number }[]) =>
+    items.map((item, i) =>
+      `<div class="legend-row"><span class="swatch" style="background:${palette[i % palette.length]}"></span><span>${escapeHtml(item.option)}</span><span class="mono">${item.count} (${item.pct}%)</span></div>`
+    ).join('');
+
+  const colChartW = (items: { option: string; count: number; pct: number }[]) => {
+    if (!items.length) return '<p class="meta">No data</p>';
+    const sorted = [...items].sort((a, b) => b.count - a.count);
+    const max = Math.max(...sorted.map(i => i.count), 1);
+    const w = 400; const h = 160; const padL = 30; const padR = 10; const padT = 12; const padB = 48;
+    const plotW = w - padL - padR; const plotH = h - padT - padB;
+    const gap = 6;
+    const barW = Math.max(10, (plotW - gap * (sorted.length - 1)) / sorted.length);
+    const barsSvg = sorted.map((item, idx) => {
+      const bh = Math.max(2, (item.count / max) * plotH);
+      const x = padL + idx * (barW + gap); const y = padT + plotH - bh;
+      const label = item.option.length > 12 ? `${escapeHtml(item.option.slice(0, 10))}…` : escapeHtml(item.option);
+      return `<g><rect x="${x}" y="${y}" width="${barW}" height="${bh}" fill="#5B9BD5" rx="2"/><text x="${x + barW / 2}" y="${y - 3}" text-anchor="middle" font-size="8" fill="#1A2838">${item.count}</text><text x="${x + barW / 2}" y="${h - 6}" text-anchor="middle" font-size="7" fill="#5A6B7D" transform="rotate(-25 ${x + barW / 2} ${h - 6})">${label}</text></g>`;
+    }).join('');
+    const grid = [0.25, 0.5, 0.75, 1].map(t => {
+      const y = padT + plotH * (1 - t);
+      return `<line x1="${padL}" y1="${y}" x2="${w - padR}" y2="${y}" stroke="#E8EDF2" stroke-width="1"/>`;
+    }).join('');
+    return `<svg viewBox="0 0 ${w} ${h}" width="100%" height="${h}" role="img">${grid}${barsSvg}</svg>`;
+  };
+
+  const distTableW = (items: { option: string; count: number; pct: number }[]) => {
+    const sorted = [...items].sort((a, b) => b.count - a.count);
+    const total = sorted.reduce((s, i) => s + i.count, 0);
+    return `<table class="stats"><thead><tr><th>Option</th><th class="text-right">Count</th><th class="text-right">%</th></tr></thead><tbody>${
+      sorted.map(i => `<tr><td>${escapeHtml(i.option)}</td><td class="mono text-right">${i.count}</td><td class="mono text-right">${i.pct}%</td></tr>`).join('')
+    }<tr class="total-row"><td><strong>Total</strong></td><td class="mono text-right"><strong>${total}</strong></td><td class="mono text-right"><strong>100%</strong></td></tr></tbody></table>`;
+  };
+
+  // Build pages for all wards combined
+  const allPages: { wardName: string; title: string; body: string }[] = [];
+
+  // Cover page
+  allPages.push({
+    wardName: '',
+    title: 'Cover',
+    body: `
+      <header class="cover">
+        <div class="brand">Tafiti · Ward-by-ward report</div>
+        <h1>${reportTitle}</h1>
+        ${surveySubtitle ? `<p class="sub">${escapeHtml(surveySubtitle)}</p>` : ''}
+        <div class="meta">Generated ${reportDate} · ${wards.length} wards</div>
+        <div class="tagline powered-by">
+          <span>Powered by</span>
+          <img src="${logoSrc}" alt="Strategic Insight" class="powered-logo" />
+        </div>
+      </header>
+      <h2>Wards included in this report</h2>
+      <table class="stats"><thead><tr><th>Ward</th><th class="text-right">Responses</th><th class="text-right">Share %</th></tr></thead><tbody>
+      ${(() => {
+        const total = Object.values(wardCounts).reduce((s, c) => s + c, 0) || 1;
+        return wards.map(w =>
+          `<tr><td>${escapeHtml(w)}</td><td class="mono text-right">${wardCounts[w]}</td><td class="mono text-right">${Math.round((wardCounts[w] / total) * 100)}%</td></tr>`
+        ).join('');
+      })()}
+      </tbody></table>`,
+  });
+
+  // One section per ward
+  for (const ward of wards) {
+    const wardRows = allResponses.filter(r => (r.location?.ward || '').trim() === ward);
+    const included = wardRows.filter(r => !isExcluded(r));
+
+    // Build per-question data for this ward
+    const perQ = questions.map((q, idx) => {
+      const dist: Record<string, number> = {};
+      let count = 0;
+      for (const r of included) {
+        const v = r.answers?.[q.id];
+        if (v == null || String(v).trim() === '') continue;
+        count++;
+        const vals = Array.isArray(v) ? v : [v];
+        for (const val of vals) {
+          const key = String(val).trim();
+          if (key) dist[key] = (dist[key] || 0) + 1;
+        }
+      }
+      const total = Object.values(dist).reduce((s, c) => s + c, 0) || 1;
+      const distribution = Object.entries(dist)
+        .map(([option, c]) => ({ option, count: c, pct: Math.round((c / total) * 100) }))
+        .sort((a, b) => b.count - a.count);
+      return { q, idx, count, distribution };
+    });
+
+    // Agent breakdown for this ward
+    const agentCounts: Record<string, number> = {};
+    for (const r of included) {
+      const name = agentName(r.agent_id) || r.agent_id;
+      agentCounts[name] = (agentCounts[name] || 0) + 1;
+    }
+    const agentDist = Object.entries(agentCounts)
+      .map(([option, c]) => {
+        const t = Object.values(agentCounts).reduce((s, x) => s + x, 0) || 1;
+        return { option, count: c, pct: Math.round((c / t) * 100) };
+      })
+      .sort((a, b) => b.count - a.count);
+
+    const wardInsight = questionInsights || {};
+
+    const qBlocks = perQ.map(({ q, idx, count, distribution }) => {
+      if (!count) return `<section class="question muted"><div class="q-head"><span class="q-num">Q${idx + 1}</span><h3>${escapeHtml(String(q.label))}</h3></div><p class="meta">No answers for this ward.</p></section>`;
+      const dist = topN(distribution, 10);
+      const insight = wardInsight[q.id]
+        ? `<p class="note" style="margin-top:6px"><strong>Insight:</strong> ${escapeHtml(wardInsight[q.id])}</p>`
+        : '';
+      if (!dist.length) return `<section class="question muted"><div class="q-head"><span class="q-num">Q${idx + 1}</span><h3>${escapeHtml(String(q.label))}</h3></div><p class="meta">n=${count} — no chartable data.</p>${insight}</section>`;
+      return `<section class="question">
+        <div class="q-head"><span class="q-num">Q${idx + 1}</span><h3>${escapeHtml(String(q.label))}</h3></div>
+        <div class="meta">n=${count}</div>
+        <div class="chart-row">
+          <div class="chart-panel"><div class="chart-title">Share (%)</div><div class="pie-card">${pieSvgW(dist, 130)}<div class="legend">${legendW(dist)}</div></div></div>
+          <div class="chart-panel"><div class="chart-title">Counts</div>${colChartW(distribution.slice(0, 12))}</div>
+        </div>
+        ${distTableW(distribution)}
+        ${insight}
+      </section>`;
+    });
+
+    const qChunked: string[][] = [];
+    for (let i = 0; i < qBlocks.length; i += 2) qChunked.push(qBlocks.slice(i, i + 2));
+
+    // Ward overview page
+    allPages.push({
+      wardName: ward,
+      title: `${ward} — Overview`,
+      body: `
+        <div class="ward-header"><span class="ward-badge">${escapeHtml(ward)}</span> <span class="ward-sub">Ward overview · ${included.length} responses</span></div>
+        <div class="grid grid-3">
+          <div class="cell"><div class="label">Included responses</div><div class="val">${included.length}</div></div>
+          <div class="cell"><div class="label">Questions</div><div class="val">${questions.length}</div></div>
+          <div class="cell"><div class="label">Field agents</div><div class="val">${agentDist.length}</div></div>
+        </div>
+        <h2>Field team</h2>
+        ${agentDist.length
+          ? `<table class="stats"><thead><tr><th>Agent</th><th class="text-right">Interviews</th><th class="text-right">%</th></tr></thead><tbody>${
+              agentDist.map(a => `<tr><td>${escapeHtml(a.option)}</td><td class="mono text-right">${a.count}</td><td class="mono text-right">${a.pct}%</td></tr>`).join('')
+            }</tbody></table>`
+          : '<p class="meta">No agent data.</p>'}`,
+    });
+
+    // Ward question pages
+    qChunked.forEach((parts, i) => {
+      allPages.push({
+        wardName: ward,
+        title: qChunked.length > 1 ? `${ward} — Questions ${i * 2 + 1}–${Math.min((i + 1) * 2, questions.length)}` : `${ward} — Questions`,
+        body: `
+          <div class="ward-header"><span class="ward-badge">${escapeHtml(ward)}</span> <span class="ward-sub">Question analysis</span></div>
+          ${parts.join('')}`,
+      });
+    });
+  }
+
+  const totalPages = allPages.length;
+  const pagesHtml = allPages.map((p, i) => `
+    <article class="report-page" data-page="${i + 1}">
+      <div class="page-topbar">
+        <span class="page-top-title">${reportTitle}${p.wardName ? ` · ${escapeHtml(p.wardName)}` : ''}</span>
+        <span class="page-top-meta">${reportDate}</span>
+      </div>
+      <div class="page-banner">
+        <span class="page-num-badge">Page ${i + 1} of ${totalPages}</span>
+        <span class="page-section">${escapeHtml(p.title)}</span>
+      </div>
+      <div class="page-body">${p.body}</div>
+      <footer class="page-footer">
+        <span class="powered-by-inline">Tafiti · <img src="${logoSrc}" alt="Strategic Insight" class="powered-logo-sm" /></span>
+        <span>${p.wardName ? escapeHtml(p.wardName) : 'All wards'}</span>
+        <span class="mono">Page ${i + 1} / ${totalPages}</span>
+      </footer>
+    </article>`).join('');
+
+  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"/><title>${reportTitle} — Ward Report</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Instrument+Sans:wght@500;600;700&family=Source+Sans+3:wght@400;600&display=swap" rel="stylesheet"/>
+<style>
+  @page { size: A4 portrait; margin: 0; }
+  * { box-sizing: border-box; }
+  body { font-family: "Source Sans 3", system-ui, sans-serif; color: #1A2838; font-size: 11px; line-height: 1.4; margin: 0; padding: 0; background: #fff; }
+  .report-page { background: #fff; padding: 8mm 10mm 6mm; margin: 0; width: 100%; page-break-after: always; break-after: page; }
+  .report-page:last-of-type { page-break-after: auto; break-after: auto; }
+  .page-topbar { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-size: 9px; color: #5A6B7D; border-bottom: 1px solid #E8EDF2; padding-bottom: 4px; margin-bottom: 6px; }
+  .page-top-title { font-family: "Instrument Sans", sans-serif; font-weight: 600; color: #1B4D3E; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .page-banner { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+  .page-num-badge { font-family: "IBM Plex Mono", monospace; font-size: 10px; font-weight: 600; background: #1B4D3E; color: #fff; padding: 4px 8px; letter-spacing: 0.02em; }
+  .page-section { font-family: "Instrument Sans", sans-serif; font-size: 12px; font-weight: 600; color: #1A2838; }
+  .page-footer { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 10px; padding-top: 6px; border-top: 1px solid #D3DAE3; font-size: 9px; color: #5A6B7D; }
+  .cover { background: linear-gradient(135deg, #1B4D3E 0%, #2d6b58 100%); color: #fff; padding: 14px 16px; margin: 0 0 10px; }
+  .cover h1 { font-family: "Instrument Sans", sans-serif; font-size: 22px; margin: 0 0 6px; font-weight: 700; }
+  .cover .sub { opacity: 0.92; font-size: 12px; }
+  .cover .meta { color: rgba(255,255,255,0.85); font-size: 11px; margin-top: 8px; }
+  .cover .tagline.powered-by { margin-top: 10px; display: flex; align-items: center; gap: 8px; font-size: 11px; opacity: 0.95; }
+  .cover .powered-logo { height: 26px; width: auto; max-width: 140px; object-fit: contain; background: #000; padding: 3px 6px; border-radius: 2px; }
+  .powered-by-inline { display: inline-flex; align-items: center; gap: 5px; flex-wrap: wrap; }
+  .powered-logo-sm { height: 15px; width: auto; max-width: 90px; object-fit: contain; background: #000; padding: 2px 4px; vertical-align: middle; }
+  .brand { font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; opacity: 0.8; margin-bottom: 8px; }
+  .ward-header { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+  .ward-badge { font-family: "Instrument Sans", sans-serif; font-size: 14px; font-weight: 700; background: #1B4D3E; color: #fff; padding: 4px 10px; border-radius: 2px; }
+  .ward-sub { font-size: 12px; color: #5A6B7D; }
+  h2 { font-family: "Instrument Sans", sans-serif; font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; margin: 12px 0 6px; border-bottom: 2px solid #1B4D3E; padding-bottom: 3px; color: #1B4D3E; }
+  h2:first-child { margin-top: 0; }
+  h3 { font-family: "Instrument Sans", sans-serif; font-size: 12px; margin: 0; font-weight: 600; }
+  .meta { color: #5A6B7D; font-size: 10px; }
+  .mono { font-family: "IBM Plex Mono", monospace; }
+  .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin: 10px 0; }
+  .grid-3 { grid-template-columns: repeat(3, 1fr); }
+  .cell { border: 1px solid #D3DAE3; padding: 10px; background: #fafbfc; }
+  .label { font-size: 9px; text-transform: uppercase; letter-spacing: 0.06em; color: #5A6B7D; }
+  .val { font-family: "IBM Plex Mono", monospace; font-size: 18px; margin-top: 4px; font-weight: 500; }
+  .question { border: 1px solid #D3DAE3; padding: 8px 10px; margin: 0 0 8px; break-inside: avoid; page-break-inside: avoid; }
+  .question.muted { opacity: 0.75; background: #f8f9fa; }
+  .q-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; margin-bottom: 6px; }
+  .q-num { font-family: "IBM Plex Mono", monospace; font-size: 10px; color: #1B4D3E; font-weight: 600; }
+  .stats { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 10px; }
+  .stats th, .stats td { border: 1px solid #D3DAE3; padding: 5px 8px; text-align: left; }
+  .stats th { background: #EEF2F5; color: #5A6B7D; font-size: 9px; text-transform: uppercase; }
+  .total-row td { background: #EEF2F5; }
+  .text-right { text-align: right; }
+  .chart-row { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin: 6px 0; break-inside: avoid; }
+  .chart-panel { min-width: 0; border: 1px solid #E8EDF2; padding: 6px; background: #fafbfc; }
+  .chart-title { font-size: 9px; text-transform: uppercase; letter-spacing: 0.06em; color: #5A6B7D; margin: 0 0 5px; }
+  .pie-card { display: flex; align-items: flex-start; gap: 10px; }
+  .legend { flex: 1; min-width: 0; }
+  .legend-row { display: grid; grid-template-columns: 9px 1fr auto; align-items: start; gap: 5px; margin: 4px 0; font-size: 10px; }
+  .swatch { width: 8px; height: 8px; margin-top: 2px; }
+  .note { padding: 7px 9px; background: #EEF2F5; border-left: 3px solid #1B4D3E; color: #3d4f63; font-size: 10px; }
+  .toolbar { position: sticky; top: 0; z-index: 5; background: #fff; padding: 6px 8px 8px; border-bottom: 1px solid #E8EDF2; }
+  @media print {
+    .noprint { display: none !important; }
+    body { padding: 0; margin: 0; }
+    .report-page { padding: 8mm 10mm 6mm; page-break-after: always; break-after: page; }
+    .report-page:last-of-type { page-break-after: auto; break-after: auto; }
+    .question { break-inside: avoid; page-break-inside: avoid; }
+  }
+</style></head><body>
+  <div class="toolbar noprint">
+    <button onclick="window.print()" style="padding:10px 16px;background:#1B4D3E;color:#fff;border:0;cursor:pointer;border-radius:4px;font-size:12px">Print / Save as PDF</button>
+    <span style="margin-left:12px;font-size:12px;color:#5A6B7D">${totalPages} pages · ${wards.length} wards · ${reportDate}</span>
+  </div>
+  ${pagesHtml}
+  <script>document.title = ${JSON.stringify(surveyTitle + ' — Ward Report')};</script>
+</body></html>`;
+
+  const safeName = (surveyTitle || 'survey').replace(/\s+/g, '_').toLowerCase();
+  return openHtmlInNewTabOrDownload(html, `${safeName}_ward_report`);
+}
 
 function escapeHtml(s: string) {
   return s

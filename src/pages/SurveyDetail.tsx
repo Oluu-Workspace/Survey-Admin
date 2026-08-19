@@ -15,7 +15,7 @@ import {
   type AnalyticsFilters,
   type ResponseFacets,
 } from '@/components/AnalyticsFilterBar';
-import { analyticsBundle, exportResponsesCsv, openPrintableReport, type ResponseLike } from '@/lib/analytics';
+import { analyticsBundle, exportResponsesCsv, openMultiWardReport, openPrintableReport, type ResponseLike } from '@/lib/analytics';
 import { fetchAllSurveyResponses } from '@/lib/fetchAllResponses';
 import { buildFullResearchReportData } from '@/lib/buildResearchReport';
 import {
@@ -402,7 +402,7 @@ const SurveyDetail = () => {
     return normalizeSurveyListFilters(reportFilters);
   };
 
-  const runPdfReport = async (source: 'report' | 'analysis' = 'report') => {
+  const runPdfReport = async (source: 'report' | 'analysis' = 'report', perWard = false) => {
     setExportBusy(true);
     try {
       toast.message('Syncing all responses and analytics…');
@@ -454,48 +454,59 @@ const SurveyDetail = () => {
       const uniqueAgents = reportBundle.byAgent.filter((a) => a.count > 0).length;
       const selectedPeriod = dateLine ? `${dateLine.title}: ${dateLine.value}` : undefined;
       const dataPeriod = collectionPeriodFromResponses(rows);
-      const result = openPrintableReport({
-        surveyTitle: survey.title || 'Survey',
-        surveySubtitle: survey.description || undefined,
-        area: [survey.ward, survey.village, survey.county].filter(Boolean).join(' · ') || 'All areas',
-        generatedAt: new Date().toLocaleString('en-GB', {
-          timeZone: 'Africa/Nairobi',
-          dateStyle: 'medium',
-          timeStyle: 'short',
-        }),
-        bundle: reportBundle,
-        executiveSummary: buildExecutiveSummary({
-          surveyTitle: survey.title || 'Survey',
-          included: reportBundle.totalIncluded,
-          excluded: reportBundle.totalExcluded,
-          completionPct: reportBundle.completionRate,
-          perQuestion: perQ,
-          collectionPeriod: selectedPeriod || dataPeriod,
-          uniqueWards,
-          uniqueAgents,
-        }),
-        conclusions: buildConclusions(perQ),
-        questionInsights,
-        keyFindings: buildKeyFindings(perQ),
-        trend: api?.trend,
-        statusBreakdown: api?.by_status,
-        comparisons: api?.comparisons,
-        totalResponsesFetched: responseCount,
-        analyticsFromApi,
-        filterSummary: filterParts.length ? filterParts.join(' · ') : undefined,
-        reportPeriod: dateLine
-          ? dateLine
-          : dataPeriod
-            ? { title: 'Report Period' as const, value: dataPeriod }
-            : undefined,
+      const generatedAt = new Date().toLocaleString('en-GB', {
+        timeZone: 'Africa/Nairobi',
+        dateStyle: 'medium',
+        timeStyle: 'short',
       });
-      if (!analyticsFromApi) {
+      const result = perWard
+        ? openMultiWardReport({
+            surveyTitle: survey.title || 'Survey',
+            surveySubtitle: survey.description || undefined,
+            generatedAt,
+            questions,
+            allResponses: rows,
+            agentName: (id) => agentName(agentMap.get(id)),
+            questionInsights,
+          })
+        : openPrintableReport({
+            surveyTitle: survey.title || 'Survey',
+            surveySubtitle: survey.description || undefined,
+            area: [survey.ward, survey.village, survey.county].filter(Boolean).join(' · ') || 'All areas',
+            generatedAt,
+            bundle: reportBundle,
+            executiveSummary: buildExecutiveSummary({
+              surveyTitle: survey.title || 'Survey',
+              included: reportBundle.totalIncluded,
+              excluded: reportBundle.totalExcluded,
+              completionPct: reportBundle.completionRate,
+              perQuestion: perQ,
+              collectionPeriod: selectedPeriod || dataPeriod,
+              uniqueWards,
+              uniqueAgents,
+            }),
+            conclusions: buildConclusions(perQ),
+            questionInsights,
+            keyFindings: buildKeyFindings(perQ),
+            trend: api?.trend,
+            statusBreakdown: api?.by_status,
+            comparisons: api?.comparisons,
+            totalResponsesFetched: responseCount,
+            analyticsFromApi,
+            filterSummary: filterParts.length ? filterParts.join(' · ') : undefined,
+            reportPeriod: dateLine
+              ? dateLine
+              : dataPeriod
+                ? { title: 'Report Period' as const, value: dataPeriod }
+                : undefined,
+          });
+      if (!analyticsFromApi && !perWard) {
         toast.message('Analytics API unavailable — report uses client-side calculations.');
       }
       if (result.mode === 'download') {
         toast.success(`Popups blocked — downloaded ${result.filename}. Open it and use Print → Save as PDF.`);
       } else {
-        toast.success('Report opened — click Print / Save as PDF in the report window.');
+        toast.success(perWard ? 'Ward report opened — click Print / Save as PDF.' : 'Report opened — click Print / Save as PDF in the report window.');
       }
     } catch (err: unknown) {
       const msg =
@@ -1039,7 +1050,8 @@ const SurveyDetail = () => {
             onCompareByChange={setCompareBy}
             analyticsLoading={analyticsLoading}
             busy={exportBusy}
-            onGeneratePdf={() => void runPdfReport('report')}
+            wardOptions={(surveyAnalytics?.by_ward ?? []).map((r: { option: string }) => r.option).filter((w: string) => w && !/^unknown/i.test(w))}
+            onGeneratePdf={(perWard) => void runPdfReport('report', perWard)}
             onGenerateCsv={() => void runCsvExport()}
           />
         </TabsContent>

@@ -35,7 +35,8 @@ type Props = {
   onCompareByChange: (v: string) => void;
   analyticsLoading?: boolean;
   busy?: boolean;
-  onGeneratePdf: () => void | Promise<void>;
+  wardOptions?: string[];
+  onGeneratePdf: (perWard?: boolean) => void | Promise<void>;
   onGenerateCsv: () => void | Promise<void>;
 };
 
@@ -64,12 +65,14 @@ export function ReportGenerationWizard({
   onCompareByChange,
   analyticsLoading,
   busy,
+  wardOptions,
   onGeneratePdf,
   onGenerateCsv,
 }: Props) {
   const [step, setStep] = useState(1);
   const [wantPdf, setWantPdf] = useState(true);
   const [wantCsv, setWantCsv] = useState(false);
+  const [perWard, setPerWard] = useState(false);
 
   const filterSummary = useMemo(() => {
     const applied = normalizeSurveyListFilters(reportFilters);
@@ -213,6 +216,22 @@ export function ReportGenerationWizard({
               </p>
             </div>
           </label>
+          {wantPdf && wardOptions && wardOptions.length > 1 ? (
+            <label className="ml-7 flex cursor-pointer items-start gap-3 border border-dashed border-border bg-muted/30 p-3">
+              <Checkbox
+                checked={perWard}
+                onCheckedChange={(v) => setPerWard(Boolean(v))}
+              />
+              <div>
+                <div className="font-display text-sm font-semibold">
+                  Generate one section per ward ({wardOptions.length} wards)
+                </div>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  Produces a combined PDF with a full breakdown for each ward — useful for comparing results across areas.
+                </p>
+              </div>
+            </label>
+          ) : null}
           <label className="flex cursor-pointer items-start gap-3 border border-border p-4">
             <Checkbox checked={wantCsv} onCheckedChange={(v) => setWantCsv(Boolean(v))} />
             <div>
@@ -248,7 +267,7 @@ export function ReportGenerationWizard({
             <li>
               Outputs:{' '}
               <span className="text-foreground">
-                {[wantPdf ? 'PDF report' : null, wantCsv ? 'CSV' : null].filter(Boolean).join(' + ') ||
+                {[wantPdf ? (perWard ? 'PDF report (per ward)' : 'PDF report') : null, wantCsv ? 'CSV' : null].filter(Boolean).join(' + ') ||
                   'None selected'}
               </span>
             </li>
@@ -258,9 +277,9 @@ export function ReportGenerationWizard({
               <Button
                 className="rounded-sm"
                 disabled={!canGenerate}
-                onClick={() => void onGeneratePdf()}
+                onClick={() => void onGeneratePdf(perWard)}
               >
-                {busy ? 'Working…' : 'Generate report'}
+                {busy ? 'Working…' : perWard ? 'Generate ward reports' : 'Generate report'}
               </Button>
             ) : null}
             {wantCsv ? (
