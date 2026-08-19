@@ -193,9 +193,6 @@ const SurveyDetail = () => {
         ...dateFilterToParams(analyticsFilters),
       });
       setSurveyAnalytics(analyticsRes);
-      if (!compareBy && analyticsRes?.compare_by) {
-        setCompareBy(analyticsRes.compare_by);
-      }
     } catch {
       setSurveyAnalytics(null);
     } finally {
