@@ -28,6 +28,15 @@ export type ResponseLike = {
 
 const EXCLUDED = new Set(['flagged', 'rejected', 'invalid', 'duplicate']);
 
+function normalizeOtherOption(raw: unknown): string {
+  const t = String(raw ?? '').trim();
+  if (!t) return '';
+  // Merge “Other” and “Others” into a single canonical “Others”.
+  // (Prevents split distributions like "Other" vs "Others".)
+  if (/^other(s)?$/i.test(t)) return 'Others';
+  return t;
+}
+
 export function isExcluded(r: ResponseLike) {
   return EXCLUDED.has((r.status || '').toLowerCase());
 }
@@ -266,7 +275,8 @@ export function analyticsBundle(
       for (const v of values) {
         const parts = Array.isArray(v) ? v : [v];
         for (const p of parts) {
-          const key = String(p);
+          const key = normalizeOtherOption(p);
+          if (!key) continue;
           dist[key] = (dist[key] || 0) + 1;
         }
       }
@@ -871,9 +881,9 @@ export function openPrintableReport(opts: {
 
     // Page: Scoreboard
     const scoreRows = ballotQuestions!
+      .filter((bq) => Boolean(geoLeaders!.overall[bq.id]))
       .map((bq) => {
-        const r = geoLeaders!.overall[bq.id];
-        if (!r) return '';
+        const r = geoLeaders!.overall[bq.id]!;
         const mc = marginClass(r.gap);
         return `<tr class="${mc}">
           <td class="race-name">${escapeHtml(bq.label)}</td>
@@ -942,9 +952,11 @@ export function openPrintableReport(opts: {
     // Pages: Per-race deep dive with village drill-down
     for (const bq of ballotQuestions!) {
       const overall = geoLeaders!.overall[bq.id];
-      if (!overall) continue;
+      const hasOverall = Boolean(overall);
 
-      const overallDist = reportBundle.perQuestion.find((q) => q.id === bq.id)?.distribution || [];
+      const overallDist = hasOverall
+        ? reportBundle.perQuestion.find((q) => q.id === bq.id)?.distribution || []
+        : [];
       const sortedOverall = [...overallDist].sort((a, b) => b.count - a.count);
       const pieData = topNWithOther(sortedOverall, 8);
 
@@ -953,7 +965,7 @@ export function openPrintableReport(opts: {
         const r = w.leaders[bq.id];
         if (!r) return '';
         const mc = marginClass(r.gap);
-        const isSwing = overall.leader !== r.leader;
+        const isSwing = hasOverall && overall!.leader !== r.leader;
         return `<tr class="${isSwing ? 'swing-row' : ''}">
           <td class="ward-name">${escapeHtml(w.ward)}</td>
           <td><strong>${escapeHtml(r.leader)}</strong></td>
@@ -973,7 +985,7 @@ export function openPrintableReport(opts: {
           .filter((v) => v.leaders[bq.id])
           .map((v) => {
             const vr = v.leaders[bq.id]!;
-            const isSwing = overall.leader !== vr.leader;
+            const isSwing = hasOverall && overall!.leader !== vr.leader;
             const mc = marginClass(vr.gap);
             return `<tr class="${isSwing ? 'swing-row' : ''}">
               <td style="padding-left:16px">${escapeHtml(v.village)}</td>
@@ -992,20 +1004,28 @@ export function openPrintableReport(opts: {
       // Race page body
       const raceBody = `
         <h2>${escapeHtml(bq.label)}</h2>
-        <p class="meta">Overall leader: <strong>${escapeHtml(overall.leader)}</strong> with ${overall.leaderPct}% (n=${overall.n})</p>
-        <div class="chart-row">
-          <div class="chart-panel">
-            <div class="chart-title">Overall distribution</div>
-            <div class="pie-card">${pieSvg(pieData, 160, 0.52)}<div class="legend">${chartLegend(pieData)}</div></div>
-          </div>
-          <div class="chart-panel">
-            <div class="chart-title">Counts</div>
-            ${columnChart(sortedOverall.slice(0, 10), 'count')}
-          </div>
-        </div>
-        ${distributionTable(sortedOverall)}
+        ${
+          hasOverall
+            ? `<p class="meta">Overall leader: <strong>${escapeHtml(overall!.leader)}</strong> with ${overall!.leaderPct}% (n=${overall!.n})</p>
+               <div class="chart-row">
+                 <div class="chart-panel">
+                   <div class="chart-title">Overall distribution</div>
+                   <div class="pie-card">${pieSvg(pieData, 160, 0.52)}<div class="legend">${chartLegend(pieData)}</div></div>
+                 </div>
+                 <div class="chart-panel">
+                   <div class="chart-title">Counts</div>
+                   ${columnChart(sortedOverall.slice(0, 10), 'count')}
+                 </div>
+               </div>
+               ${distributionTable(sortedOverall)}`
+            : `<p class="meta">Ward-specific race (MCA candidates differ by ward). Use ward and village breakdowns below.</p>`
+        }
         <h2>Ward breakdown — ${escapeHtml(bq.label)}</h2>
-        <p class="meta">Leader and runner-up per ward. Highlighted rows indicate swing wards (different leader from overall).</p>
+        <p class="meta">${
+          hasOverall
+            ? 'Leader and runner-up per ward. Highlighted rows indicate swing wards (different leader from overall).'
+            : 'Leader and runner-up per ward (ward-specific candidates).'
+        }</p>
         <table class="stats">
           <thead><tr><th>Ward</th><th>Leader</th><th class="text-right">%</th><th>Runner-up</th><th class="text-right">%</th><th class="text-right">Gap</th><th class="text-right">n</th></tr></thead>
           <tbody>${wardBreakdownRows}</tbody>
@@ -1022,7 +1042,11 @@ export function openPrintableReport(opts: {
           title: `${bq.label} — Villages`,
           body: `
             <h2>Village drill-down — ${escapeHtml(bq.label)}</h2>
-            <p class="meta">Per-village results grouped by ward. Highlighted rows = swing villages (different leader from overall).</p>
+            <p class="meta">${
+              hasOverall
+                ? 'Per-village results grouped by ward. Highlighted rows = swing villages (different leader from overall).'
+                : 'Per-village results grouped by ward (ward-specific candidates).'
+            }</p>
             <table class="stats village-drill">
               <thead><tr><th>Village</th><th>Leader</th><th class="text-right">%</th><th>Runner-up</th><th class="text-right">%</th><th class="text-right">Gap</th><th class="text-right">n</th></tr></thead>
               <tbody>${villageBlocks}</tbody>
@@ -1413,7 +1437,7 @@ export function openMultiWardReport(opts: {
         count++;
         const vals = Array.isArray(v) ? v : [v];
         for (const val of vals) {
-          const key = String(val).trim();
+          const key = normalizeOtherOption(val);
           if (key) dist[key] = (dist[key] || 0) + 1;
         }
       }

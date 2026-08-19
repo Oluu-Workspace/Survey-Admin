@@ -53,6 +53,19 @@ export type VillageLeaderRow = {
   leaders: Record<string, RaceLeader>;
 };
 
+function isMcaQuestion(q: { id: string; label: string }): boolean {
+  const blob = `${q.id} ${q.label}`.toLowerCase();
+  return /\bmca\b/.test(blob) || /_mca\b/.test(blob);
+}
+
+function normalizeCandidateOption(raw: string): string {
+  const t = String(raw || '').trim();
+  if (!t) return '';
+  // Normalize both "Other" and "Others" variants into a single canonical label.
+  if (/^other(s)?$/i.test(t)) return 'Others';
+  return t;
+}
+
 function computeLeader(
   responses: ResponseLike[],
   questionId: string,
@@ -66,7 +79,7 @@ function computeLeader(
     total++;
     const vals = Array.isArray(v) ? v : [v];
     for (const val of vals) {
-      const key = String(val).trim();
+      const key = normalizeCandidateOption(String(val));
       if (key) freq[key] = (freq[key] || 0) + 1;
     }
   }
@@ -104,6 +117,9 @@ export function buildGeographicLeaders(
   // Overall leaders
   const overall: Record<string, RaceLeader> = {};
   for (const q of ballotQuestions) {
+    // MCA candidates vary by ward — overall pooling creates incorrect leaders.
+    // We intentionally skip "overall" for MCA and only compute it per ward/village.
+    if (isMcaQuestion(q)) continue;
     const leader = computeLeader(included, q.id);
     if (leader) overall[q.id] = leader;
   }
