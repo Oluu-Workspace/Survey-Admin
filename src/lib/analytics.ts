@@ -7,6 +7,7 @@ import {
   isAgeNumberQuestion,
   isIdentityQuestion,
 } from './chartableQuestions';
+import type { RaceLeader, WardLeaderRow } from './researchInsights';
 
 export type ResponseLike = {
   id: string;
@@ -367,6 +368,8 @@ export function openPrintableReport(opts: {
   analyticsFromApi?: boolean;
   filterSummary?: string;
   reportPeriod?: { title: string; value: string };
+  geoLeaders?: { overall: Record<string, RaceLeader>; wards: WardLeaderRow[] };
+  ballotQuestions?: { id: string; label: string }[];
 }): OpenHtmlReportResult {
   const {
     surveyTitle,
@@ -386,6 +389,7 @@ export function openPrintableReport(opts: {
     filterSummary,
     reportPeriod,
   } = opts;
+  const { geoLeaders, ballotQuestions } = opts;
   void _analyticsFromApi;
   const logoSrc =
     typeof window !== 'undefined'
@@ -858,6 +862,177 @@ export function openPrintableReport(opts: {
       ${trendHtml}`,
   });
 
+  // ── Ballot / political race pages ──────────────────────────────
+  const hasBallot = geoLeaders && ballotQuestions && ballotQuestions.length > 0;
+
+  if (hasBallot) {
+    const marginClass = (gap: number) =>
+      gap >= 20 ? 'margin-dominant' : gap >= 10 ? 'margin-comfortable' : gap >= 5 ? 'margin-close' : 'margin-tight';
+
+    // Page: Scoreboard
+    const scoreRows = ballotQuestions!
+      .map((bq) => {
+        const r = geoLeaders!.overall[bq.id];
+        if (!r) return '';
+        const mc = marginClass(r.gap);
+        return `<tr class="${mc}">
+          <td class="race-name">${escapeHtml(bq.label)}</td>
+          <td><strong>${escapeHtml(r.leader)}</strong></td>
+          <td class="mono text-right">${r.leaderPct}%</td>
+          <td>${r.runnerUp ? escapeHtml(r.runnerUp) : '—'}</td>
+          <td class="mono text-right">${r.runnerUpPct ?? 0}%</td>
+          <td class="mono text-right gap-cell"><span class="gap-badge ${mc}">+${r.gap}pts</span></td>
+          <td class="mono text-right">${r.n.toLocaleString()}</td>
+        </tr>`;
+      })
+      .join('');
+
+    pages.push({
+      title: 'Results at a glance',
+      body: `
+        <h2>Results at a glance</h2>
+        <p class="meta">Leader and runner-up for each race — overall results across all wards.</p>
+        <table class="stats scoreboard">
+          <thead><tr>
+            <th>Race</th><th>Leader</th><th class="text-right">%</th>
+            <th>Runner-up</th><th class="text-right">%</th>
+            <th class="text-right">Margin</th><th class="text-right">n</th>
+          </tr></thead>
+          <tbody>${scoreRows}</tbody>
+        </table>
+        <div class="margin-legend">
+          <span><span class="gap-badge margin-dominant">■</span> Dominant (20+ pts)</span>
+          <span><span class="gap-badge margin-comfortable">■</span> Comfortable (10–19 pts)</span>
+          <span><span class="gap-badge margin-close">■</span> Close (5–9 pts)</span>
+          <span><span class="gap-badge margin-tight">■</span> Very tight (&lt;5 pts)</span>
+        </div>`,
+    });
+
+    // Page: Ward leaders matrix
+    if (geoLeaders!.wards.length > 0) {
+      const wardMatrixHeaders = ballotQuestions!.map((bq) => {
+        const shortLabel = bq.label.replace(/\b(who\s+(?:is\s+)?|would\s+you\s+|your?\s+preferred?\s+|choice\s+for\s+)/gi, '').replace(/\?.*$/, '').trim();
+        return `<th>${escapeHtml(shortLabel || bq.label)}</th>`;
+      }).join('');
+
+      const wardMatrixRows = geoLeaders!.wards.map((w) => {
+        const cells = ballotQuestions!.map((bq) => {
+          const r = w.leaders[bq.id];
+          if (!r) return '<td class="meta">—</td>';
+          const overallLeader = geoLeaders!.overall[bq.id]?.leader;
+          const isSwing = overallLeader && r.leader !== overallLeader;
+          const mc = marginClass(r.gap);
+          return `<td class="${isSwing ? 'swing-cell' : ''}"><strong>${escapeHtml(r.leader)}</strong> <span class="mono gap-badge ${mc}">${r.leaderPct}%</span></td>`;
+        }).join('');
+        return `<tr><td class="ward-name">${escapeHtml(w.ward)} <span class="meta">(n=${w.n})</span></td>${cells}</tr>`;
+      }).join('');
+
+      pages.push({
+        title: 'Ward leaders matrix',
+        body: `
+          <h2>Ward leaders matrix</h2>
+          <p class="meta">Who leads each race in each ward. Highlighted cells indicate a different leader from the overall result (swing ward).</p>
+          <table class="stats ward-matrix">
+            <thead><tr><th>Ward</th>${wardMatrixHeaders}</tr></thead>
+            <tbody>${wardMatrixRows}</tbody>
+          </table>`,
+      });
+    }
+
+    // Pages: Per-race deep dive with village drill-down
+    for (const bq of ballotQuestions!) {
+      const overall = geoLeaders!.overall[bq.id];
+      if (!overall) continue;
+
+      const overallDist = reportBundle.perQuestion.find((q) => q.id === bq.id)?.distribution || [];
+      const sortedOverall = [...overallDist].sort((a, b) => b.count - a.count);
+      const pieData = topNWithOther(sortedOverall, 8);
+
+      // Ward breakdown rows
+      const wardBreakdownRows = geoLeaders!.wards.map((w) => {
+        const r = w.leaders[bq.id];
+        if (!r) return '';
+        const mc = marginClass(r.gap);
+        const isSwing = overall.leader !== r.leader;
+        return `<tr class="${isSwing ? 'swing-row' : ''}">
+          <td class="ward-name">${escapeHtml(w.ward)}</td>
+          <td><strong>${escapeHtml(r.leader)}</strong></td>
+          <td class="mono text-right">${r.leaderPct}%</td>
+          <td>${r.runnerUp ? escapeHtml(r.runnerUp) : '—'}</td>
+          <td class="mono text-right">${r.runnerUpPct ?? 0}%</td>
+          <td class="mono text-right"><span class="gap-badge ${mc}">+${r.gap}</span></td>
+          <td class="mono text-right">${r.n}</td>
+        </tr>`;
+      }).join('');
+
+      // Village sections under each ward
+      const villageBlocks = geoLeaders!.wards.map((w) => {
+        const r = w.leaders[bq.id];
+        if (!r || !w.villages.length) return '';
+        const villRows = w.villages
+          .filter((v) => v.leaders[bq.id])
+          .map((v) => {
+            const vr = v.leaders[bq.id]!;
+            const isSwing = overall.leader !== vr.leader;
+            const mc = marginClass(vr.gap);
+            return `<tr class="${isSwing ? 'swing-row' : ''}">
+              <td style="padding-left:16px">${escapeHtml(v.village)}</td>
+              <td><strong>${escapeHtml(vr.leader)}</strong></td>
+              <td class="mono text-right">${vr.leaderPct}%</td>
+              <td>${vr.runnerUp ? escapeHtml(vr.runnerUp) : '—'}</td>
+              <td class="mono text-right">${vr.runnerUpPct ?? 0}%</td>
+              <td class="mono text-right"><span class="gap-badge ${mc}">+${vr.gap}</span></td>
+              <td class="mono text-right">${vr.n}</td>
+            </tr>`;
+          }).join('');
+        if (!villRows) return '';
+        return `<tr class="ward-group-header"><td colspan="7">${escapeHtml(w.ward)} <span class="meta">(${w.n} responses)</span></td></tr>${villRows}`;
+      }).join('');
+
+      // Race page body
+      const raceBody = `
+        <h2>${escapeHtml(bq.label)}</h2>
+        <p class="meta">Overall leader: <strong>${escapeHtml(overall.leader)}</strong> with ${overall.leaderPct}% (n=${overall.n})</p>
+        <div class="chart-row">
+          <div class="chart-panel">
+            <div class="chart-title">Overall distribution</div>
+            <div class="pie-card">${pieSvg(pieData, 160, 0.52)}<div class="legend">${chartLegend(pieData)}</div></div>
+          </div>
+          <div class="chart-panel">
+            <div class="chart-title">Counts</div>
+            ${columnChart(sortedOverall.slice(0, 10), 'count')}
+          </div>
+        </div>
+        ${distributionTable(sortedOverall)}
+        <h2>Ward breakdown — ${escapeHtml(bq.label)}</h2>
+        <p class="meta">Leader and runner-up per ward. Highlighted rows indicate swing wards (different leader from overall).</p>
+        <table class="stats">
+          <thead><tr><th>Ward</th><th>Leader</th><th class="text-right">%</th><th>Runner-up</th><th class="text-right">%</th><th class="text-right">Gap</th><th class="text-right">n</th></tr></thead>
+          <tbody>${wardBreakdownRows}</tbody>
+        </table>`;
+
+      pages.push({
+        title: bq.label,
+        body: raceBody,
+      });
+
+      // Village drill-down page (separate to avoid overflow)
+      if (villageBlocks) {
+        pages.push({
+          title: `${bq.label} — Villages`,
+          body: `
+            <h2>Village drill-down — ${escapeHtml(bq.label)}</h2>
+            <p class="meta">Per-village results grouped by ward. Highlighted rows = swing villages (different leader from overall).</p>
+            <table class="stats village-drill">
+              <thead><tr><th>Village</th><th>Leader</th><th class="text-right">%</th><th>Runner-up</th><th class="text-right">%</th><th class="text-right">Gap</th><th class="text-right">n</th></tr></thead>
+              <tbody>${villageBlocks}</tbody>
+            </table>`,
+        });
+      }
+    }
+  }
+  // ── End ballot pages ───────────────────────────────────────────
+
   const qChunks = chunk(questionBlocks, 2);
   qChunks.forEach((parts, i) => {
     if (!parts.length) return;
@@ -1031,6 +1206,27 @@ export function openPrintableReport(opts: {
   .col-chart { display: block; margin: 4px 0 8px; }
   .toc { font-size: 10px; color: #5A6B7D; margin: 0 0 14px; }
   .note { padding: 8px 10px; background: #EEF2F5; border-left: 3px solid #1B4D3E; color: #3d4f63; font-size: 10px; }
+  .scoreboard td { vertical-align: middle; }
+  .race-name { font-family: "Instrument Sans", sans-serif; font-weight: 600; font-size: 11px; }
+  .gap-badge { display: inline-block; padding: 1px 5px; border-radius: 2px; font-size: 9px; font-weight: 600; font-family: "IBM Plex Mono", monospace; }
+  .margin-dominant .gap-badge, .gap-badge.margin-dominant { background: #d4edda; color: #155724; }
+  .margin-comfortable .gap-badge, .gap-badge.margin-comfortable { background: #d1ecf1; color: #0c5460; }
+  .margin-close .gap-badge, .gap-badge.margin-close { background: #fff3cd; color: #856404; }
+  .margin-tight .gap-badge, .gap-badge.margin-tight { background: #f8d7da; color: #721c24; }
+  .margin-dominant { background: #f0faf3; }
+  .margin-comfortable { background: #f0f8fa; }
+  .margin-close { background: #fffef5; }
+  .margin-tight { background: #fef5f5; }
+  .margin-legend { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 10px; font-size: 9px; color: #5A6B7D; }
+  .margin-legend .gap-badge { font-size: 8px; padding: 0 4px; }
+  .ward-matrix td { font-size: 10px; vertical-align: middle; }
+  .ward-matrix .ward-name { font-family: "Instrument Sans", sans-serif; font-weight: 600; white-space: nowrap; }
+  .swing-cell { background: #fff3cd !important; border-left: 3px solid #e0a800; }
+  .swing-row td { background: #fffef5; }
+  .swing-row td:first-child { border-left: 3px solid #e0a800; }
+  .ward-group-header td { background: #1B4D3E; color: #fff; font-family: "Instrument Sans", sans-serif; font-weight: 600; font-size: 10px; padding: 4px 8px; }
+  .gap-cell { white-space: nowrap; }
+  .village-drill td { font-size: 9px; padding: 3px 6px; }
   .toolbar { position: sticky; top: 0; z-index: 5; background: #fff; padding: 6px 8px 8px; margin-bottom: 0; border-bottom: 1px solid #E8EDF2; }
   @media print {
     .noprint { display: none !important; }

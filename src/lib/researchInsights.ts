@@ -1,5 +1,6 @@
 import type { QuestionAnalytics } from '@/components/SurveyAnalyticsPanel';
 import type { ResponseLike } from '@/lib/analytics';
+import { isExcluded } from '@/lib/analytics';
 import { isChartableAnalyticsRow } from '@/lib/chartableQuestions';
 
 function topDistribution(q: QuestionAnalytics) {
@@ -9,6 +10,144 @@ function topDistribution(q: QuestionAnalytics) {
 
 function sortedDist(q: QuestionAnalytics) {
   return [...(q.distribution || [])].sort((a, b) => b.count - a.count);
+}
+
+// ---------------------------------------------------------------------------
+// Ballot / political question detection
+// ---------------------------------------------------------------------------
+
+const BALLOT_RE =
+  /\b(president|governor|senator|women.?rep|member.?of.?parliament|mp|mca|ballot|candidate|vote|prefer|support)\b/i;
+
+export function isBallotQuestion(q: { id?: string; label?: string }): boolean {
+  const blob = `${q.id || ''} ${q.label || ''}`;
+  return BALLOT_RE.test(blob);
+}
+
+// ---------------------------------------------------------------------------
+// Per-ward and per-village leader computation
+// ---------------------------------------------------------------------------
+
+export type RaceLeader = {
+  leader: string;
+  leaderCount: number;
+  leaderPct: number;
+  runnerUp?: string;
+  runnerUpCount?: number;
+  runnerUpPct?: number;
+  gap: number;
+  n: number;
+};
+
+export type WardLeaderRow = {
+  ward: string;
+  n: number;
+  leaders: Record<string, RaceLeader>;
+  villages: VillageLeaderRow[];
+};
+
+export type VillageLeaderRow = {
+  village: string;
+  ward: string;
+  n: number;
+  leaders: Record<string, RaceLeader>;
+};
+
+function computeLeader(
+  responses: ResponseLike[],
+  questionId: string,
+): RaceLeader | null {
+  const freq: Record<string, number> = {};
+  let total = 0;
+  for (const r of responses) {
+    if (isExcluded(r)) continue;
+    const v = r.answers?.[questionId];
+    if (v == null || String(v).trim() === '') continue;
+    total++;
+    const vals = Array.isArray(v) ? v : [v];
+    for (const val of vals) {
+      const key = String(val).trim();
+      if (key) freq[key] = (freq[key] || 0) + 1;
+    }
+  }
+  if (!total) return null;
+  const sorted = Object.entries(freq).sort((a, b) => b[1] - a[1]);
+  if (!sorted.length) return null;
+  const [leader, leaderCount] = sorted[0];
+  const leaderPct = Math.round((leaderCount / total) * 100);
+  const second = sorted[1];
+  return {
+    leader,
+    leaderCount,
+    leaderPct,
+    runnerUp: second?.[0],
+    runnerUpCount: second?.[1],
+    runnerUpPct: second ? Math.round((second[1] / total) * 100) : undefined,
+    gap: second ? leaderPct - Math.round((second[1] / total) * 100) : leaderPct,
+    n: total,
+  };
+}
+
+/**
+ * Build a full geographic breakdown: for each ballot question,
+ * compute leaders at overall, ward, and village level.
+ */
+export function buildGeographicLeaders(
+  responses: ResponseLike[],
+  ballotQuestions: { id: string; label: string }[],
+): {
+  overall: Record<string, RaceLeader>;
+  wards: WardLeaderRow[];
+} {
+  const included = responses.filter((r) => !isExcluded(r));
+
+  // Overall leaders
+  const overall: Record<string, RaceLeader> = {};
+  for (const q of ballotQuestions) {
+    const leader = computeLeader(included, q.id);
+    if (leader) overall[q.id] = leader;
+  }
+
+  // Group by ward
+  const wardGroups: Record<string, ResponseLike[]> = {};
+  for (const r of included) {
+    const w = (r.location?.ward || '').trim();
+    if (!w || /^unknown/i.test(w)) continue;
+    (wardGroups[w] ??= []).push(r);
+  }
+
+  const wards: WardLeaderRow[] = Object.entries(wardGroups)
+    .sort((a, b) => b[1].length - a[1].length)
+    .map(([ward, wardResponses]) => {
+      const leaders: Record<string, RaceLeader> = {};
+      for (const q of ballotQuestions) {
+        const leader = computeLeader(wardResponses, q.id);
+        if (leader) leaders[q.id] = leader;
+      }
+
+      // Group by village within this ward
+      const villageGroups: Record<string, ResponseLike[]> = {};
+      for (const r of wardResponses) {
+        const v = (r.location?.village || '').trim();
+        if (!v || /^unknown/i.test(v)) continue;
+        (villageGroups[v] ??= []).push(r);
+      }
+
+      const villages: VillageLeaderRow[] = Object.entries(villageGroups)
+        .sort((a, b) => b[1].length - a[1].length)
+        .map(([village, villageResponses]) => {
+          const vLeaders: Record<string, RaceLeader> = {};
+          for (const q of ballotQuestions) {
+            const leader = computeLeader(villageResponses, q.id);
+            if (leader) vLeaders[q.id] = leader;
+          }
+          return { village, ward, n: villageResponses.length, leaders: vLeaders };
+        });
+
+      return { ward, n: wardResponses.length, leaders, villages };
+    });
+
+  return { overall, wards };
 }
 
 /** Rule-based narrative insights from question distributions (no external AI). */

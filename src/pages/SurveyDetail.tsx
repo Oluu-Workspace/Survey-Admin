@@ -21,9 +21,11 @@ import { buildFullResearchReportData } from '@/lib/buildResearchReport';
 import {
   buildConclusions,
   buildExecutiveSummary,
+  buildGeographicLeaders,
   buildKeyFindings,
   collectionPeriodFromResponses,
   generateQuestionInsight,
+  isBallotQuestion,
 } from '@/lib/researchInsights';
 import { ReportGenerationWizard } from '@/components/ReportGenerationWizard';
 import {
@@ -459,6 +461,10 @@ const SurveyDetail = () => {
         dateStyle: 'medium',
         timeStyle: 'short',
       });
+      // Detect ballot questions and compute geographic leaders
+      const detectedBallot = questions.filter(isBallotQuestion).map((q) => ({ id: q.id, label: q.label }));
+      const geoLeaders = detectedBallot.length > 0 ? buildGeographicLeaders(rows, detectedBallot) : undefined;
+
       const result = perWard
         ? openMultiWardReport({
             surveyTitle: survey.title || 'Survey',
@@ -475,6 +481,8 @@ const SurveyDetail = () => {
             area: [survey.ward, survey.village, survey.county].filter(Boolean).join(' · ') || 'All areas',
             generatedAt,
             bundle: reportBundle,
+            geoLeaders,
+            ballotQuestions: detectedBallot.length > 0 ? detectedBallot : undefined,
             executiveSummary: buildExecutiveSummary({
               surveyTitle: survey.title || 'Survey',
               included: reportBundle.totalIncluded,
