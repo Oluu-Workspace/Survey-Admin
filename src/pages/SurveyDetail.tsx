@@ -15,17 +15,13 @@ import {
   type AnalyticsFilters,
   type ResponseFacets,
 } from '@/components/AnalyticsFilterBar';
-import { analyticsBundle, exportResponsesCsv, openMultiWardReport, openPrintableReport, type ResponseLike } from '@/lib/analytics';
+import { analyticsBundle, exportResponsesCsv, openMultiWardReport, type ResponseLike } from '@/lib/analytics';
+import { generateAnalyticalReport } from '@/lib/report';
 import { fetchAllSurveyResponses } from '@/lib/fetchAllResponses';
 import { buildFullResearchReportData } from '@/lib/buildResearchReport';
 import {
-  buildConclusions,
-  buildExecutiveSummary,
-  buildGeographicLeaders,
-  buildKeyFindings,
   collectionPeriodFromResponses,
   generateQuestionInsight,
-  isBallotQuestion,
 } from '@/lib/researchInsights';
 import { ReportGenerationWizard } from '@/components/ReportGenerationWizard';
 import {
@@ -408,11 +404,8 @@ const SurveyDetail = () => {
       const applied = listFiltersForExport(source);
       if (source === 'report') setReportFilters(applied);
       const {
-        bundle: reportBundle,
         rows,
         perQuestion: perQ,
-        api,
-        responseCount,
         analyticsFromApi,
       } = await buildFullResearchReportData(
         surveyId,
@@ -446,11 +439,6 @@ const SurveyDetail = () => {
           analyticsFilters.answerQuestionId;
         filterParts.push(`${qLabel} = ${analyticsFilters.answerValue}`);
       }
-      const uniqueWards = Object.keys(reportBundle.byWard).filter((w) => {
-        const n = (w || '').trim().toLowerCase();
-        return n && n !== 'unknown ward' && n !== 'unknown';
-      }).length;
-      const uniqueAgents = reportBundle.byAgent.filter((a) => a.count > 0).length;
       const selectedPeriod = dateLine ? `${dateLine.title}: ${dateLine.value}` : undefined;
       const dataPeriod = collectionPeriodFromResponses(rows);
       const generatedAt = new Date().toLocaleString('en-GB', {
@@ -458,10 +446,7 @@ const SurveyDetail = () => {
         dateStyle: 'medium',
         timeStyle: 'short',
       });
-      // Detect ballot questions and compute geographic leaders
-      const detectedBallot = questions.filter(isBallotQuestion).map((q) => ({ id: q.id, label: q.label }));
-      const geoLeaders = detectedBallot.length > 0 ? buildGeographicLeaders(rows, detectedBallot) : undefined;
-
+      // Per-ward reports keep the legacy multi-ward HTML renderer.
       const result = perWard
         ? openMultiWardReport({
             surveyTitle: survey.title || 'Survey',
@@ -472,38 +457,16 @@ const SurveyDetail = () => {
             agentName: (id) => agentName(agentMap.get(id)),
             questionInsights,
           })
-        : openPrintableReport({
+        : await generateAnalyticalReport({
+            surveyId,
             surveyTitle: survey.title || 'Survey',
-            surveySubtitle: survey.description || undefined,
-            area: [survey.ward, survey.village, survey.county].filter(Boolean).join(' · ') || 'All areas',
+            region: [survey.ward, survey.village, survey.county].filter(Boolean).join(' · ') || 'All areas',
+            fieldDates: selectedPeriod || dataPeriod || 'See methodology',
             generatedAt,
-            bundle: reportBundle,
-            geoLeaders,
-            ballotQuestions: detectedBallot.length > 0 ? detectedBallot : undefined,
-            executiveSummary: buildExecutiveSummary({
-              surveyTitle: survey.title || 'Survey',
-              included: reportBundle.totalIncluded,
-              excluded: reportBundle.totalExcluded,
-              completionPct: reportBundle.completionRate,
-              perQuestion: perQ,
-              collectionPeriod: selectedPeriod || dataPeriod,
-              uniqueWards,
-              uniqueAgents,
-            }),
-            conclusions: buildConclusions(perQ),
-            questionInsights,
-            keyFindings: buildKeyFindings(perQ),
-            trend: api?.trend,
-            statusBreakdown: api?.by_status,
-            comparisons: api?.comparisons,
-            totalResponsesFetched: responseCount,
-            analyticsFromApi,
+            questions,
+            responses: rows,
+            agentName: (id) => agentName(agentMap.get(id)),
             filterSummary: filterParts.length ? filterParts.join(' · ') : undefined,
-            reportPeriod: dateLine
-              ? dateLine
-              : dataPeriod
-                ? { title: 'Report Period' as const, value: dataPeriod }
-                : undefined,
           });
       if (!analyticsFromApi && !perWard) {
         toast.message('Analytics API unavailable — report uses client-side calculations.');

@@ -1,0 +1,93 @@
+{
+  "schemaVersion": 1,
+  "surveyId": "lari-constituency-opinion-poll",
+  "title": "Lari Constituency Opinion Poll",
+  "confidentialityNotice": "Confidential — for authorized use only. Respondent identities are not disclosed in this report.",
+  "consentQuestionId": "lari_consent",
+  "headlineQuestionIds": [
+    "lari_president",
+    "lari_governor",
+    "lari_senator",
+    "lari_women_rep",
+    "lari_mp",
+    "lari_mca"
+  ],
+  "demographicQuestionIds": [
+    "lari_age",
+    "lari_gender",
+    "lari_education",
+    "lari_occupation",
+    "lari_ward",
+    "lari_village"
+  ],
+  "horseRaceQuestionIds": [
+    "lari_president",
+    "lari_governor",
+    "lari_senator",
+    "lari_women_rep",
+    "lari_mp",
+    "lari_mca"
+  ],
+  "undecidedLabels": ["Undecided", "Not sure", "Prefer not to say", "Other / Prefer not to say"],
+  "openTextSampleSize": 500,
+  "weighting": {
+    "enabled": false,
+    "variableQuestionId": "lari_ward"
+  },
+  "sections": [
+    {
+      "id": "demographics",
+      "title": "Demographic profile",
+      "accent": "#1B4D3E",
+      "questionIds": ["lari_age", "lari_gender", "lari_education", "lari_occupation", "lari_ward", "lari_village"]
+    },
+    {
+      "id": "civic",
+      "title": "Civic participation & attitudes",
+      "accent": "#2C4A6E",
+      "questionIds": [
+        "lari_voted_2022",
+        "lari_position_mattered",
+        "lari_plan_vote_2027",
+        "lari_vote_motivation",
+        "lari_leader_rank_1",
+        "lari_leader_rank_2",
+        "lari_leader_rank_3",
+        "lari_leader_rank_4",
+        "lari_leader_rank_5",
+        "lari_party_influence",
+        "lari_political_issues",
+        "lari_news_source"
+      ]
+    },
+    {
+      "id": "ballot",
+      "title": "Ballot preference",
+      "accent": "#8B3A2F",
+      "questionIds": [
+        "lari_president",
+        "lari_governor",
+        "lari_senator",
+        "lari_women_rep",
+        "lari_mp",
+        "lari_mca"
+      ]
+    },
+    {
+      "id": "community",
+      "title": "Community priorities",
+      "accent": "#A67C52",
+      "questionIds": [
+        "lari_community_issues",
+        "lari_immediate_issues",
+        "lari_development_satisfaction"
+      ]
+    }
+  ],
+  "crosstabs": [
+    { "questionId": "lari_president", "byQuestionId": "lari_ward", "headlineOnlyIfSignificant": true },
+    { "questionId": "lari_governor", "byQuestionId": "lari_ward", "headlineOnlyIfSignificant": true },
+    { "questionId": "lari_mp", "byQuestionId": "lari_ward", "headlineOnlyIfSignificant": true },
+    { "questionId": "lari_president", "byQuestionId": "lari_gender", "headlineOnlyIfSignificant": true }
+  ]
+}

@@ -1,0 +1,51 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "SurveyReportConfig",
+  "type": "object",
+  "required": ["schemaVersion", "surveyId", "headlineQuestionIds", "sections"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "surveyId": { "type": "string" },
+    "title": { "type": "string" },
+    "confidentialityNotice": { "type": "string" },
+    "headlineQuestionIds": { "type": "array", "items": { "type": "string" } },
+    "consentQuestionId": { "type": "string" },
+    "demographicQuestionIds": { "type": "array", "items": { "type": "string" } },
+    "horseRaceQuestionIds": { "type": "array", "items": { "type": "string" } },
+    "undecidedLabels": { "type": "array", "items": { "type": "string" } },
+    "openTextSampleSize": { "type": "number", "minimum": 50 },
+    "weighting": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "variableQuestionId": { "type": "string" },
+        "targetShares": { "type": "object", "additionalProperties": { "type": "number" } }
+      }
+    },
+    "sections": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "title", "questionIds"],
+        "properties": {
+          "id": { "type": "string" },
+          "title": { "type": "string" },
+          "questionIds": { "type": "array", "items": { "type": "string" } },
+          "accent": { "type": "string" }
+        }
+      }
+    },
+    "crosstabs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["questionId", "byQuestionId"],
+        "properties": {
+          "questionId": { "type": "string" },
+          "byQuestionId": { "type": "string" },
+          "headlineOnlyIfSignificant": { "type": "boolean" }
+        }
+      }
+    }
+  }
+}
