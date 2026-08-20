@@ -211,8 +211,8 @@ export function ReportGenerationWizard({
                 Research report (PDF)
               </div>
               <p className="mt-1 text-sm text-muted-foreground">
-                Executive summary, charts, question breakdowns, and conclusions — print or save as
-                PDF from the browser.
+                Executive summary, charts, demographics (education, occupation, gender, age), and
+                question breakdowns. Names and phone numbers are never included.
               </p>
             </div>
           </label>
@@ -262,6 +262,12 @@ export function ReportGenerationWizard({
               Filters:{' '}
               <span className="text-foreground">
                 {filterSummary.length ? filterSummary.join(' · ') : 'None (all data)'}
+              </span>
+            </li>
+            <li>
+              Privacy:{' '}
+              <span className="text-foreground">
+                Names &amp; phone numbers omitted — education, occupation, and other demographics stay in
               </span>
             </li>
             <li>

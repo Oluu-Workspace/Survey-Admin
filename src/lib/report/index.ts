@@ -6,6 +6,7 @@ import {
   buildDefaultConfig,
   loadReportConfig,
 } from './reportAggregation';
+import { questionsForReport } from './reportPrivacy';
 import { renderAnalyticalReportHtml } from './reportRender';
 
 export type GenerateAnalyticalReportInput = {
@@ -23,9 +24,10 @@ export type GenerateAnalyticalReportInput = {
 export async function generateAnalyticalReport(
   input: GenerateAnalyticalReportInput,
 ): Promise<OpenHtmlReportResult> {
+  const reportQuestions = questionsForReport(input.questions);
   const config =
     (await loadReportConfig(input.surveyId)) ??
-    buildDefaultConfig(input.surveyId, input.surveyTitle, input.questions);
+    buildDefaultConfig(input.surveyId, input.surveyTitle, reportQuestions);
 
   const report = aggregateReport({
     config,
@@ -33,7 +35,7 @@ export async function generateAnalyticalReport(
     region: input.region,
     generatedAt: input.generatedAt,
     fieldDates: input.fieldDates,
-    questions: input.questions,
+    questions: reportQuestions,
     responses: input.responses,
     agentName: input.agentName,
   });

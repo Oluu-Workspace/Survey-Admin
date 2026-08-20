@@ -17,6 +17,7 @@ import {
 } from '@/components/AnalyticsFilterBar';
 import { analyticsBundle, exportResponsesCsv, openMultiWardReport, type ResponseLike } from '@/lib/analytics';
 import { generateAnalyticalReport } from '@/lib/report';
+import { questionsForReport } from '@/lib/report/reportPrivacy';
 import { fetchAllSurveyResponses } from '@/lib/fetchAllResponses';
 import { buildFullResearchReportData } from '@/lib/buildResearchReport';
 import {
@@ -446,13 +447,14 @@ const SurveyDetail = () => {
         dateStyle: 'medium',
         timeStyle: 'short',
       });
-      // Per-ward reports keep the legacy multi-ward HTML renderer.
+      // Never pass phone/name/email questions into any PDF path from the wizard.
+      const reportQuestions = questionsForReport(questions);
       const result = perWard
         ? openMultiWardReport({
             surveyTitle: survey.title || 'Survey',
             surveySubtitle: survey.description || undefined,
             generatedAt,
-            questions,
+            questions: reportQuestions,
             allResponses: rows,
             agentName: (id) => agentName(agentMap.get(id)),
             questionInsights,
@@ -463,7 +465,7 @@ const SurveyDetail = () => {
             region: [survey.ward, survey.village, survey.county].filter(Boolean).join(' · ') || 'All areas',
             fieldDates: selectedPeriod || dataPeriod || 'See methodology',
             generatedAt,
-            questions,
+            questions: reportQuestions,
             responses: rows,
             agentName: (id) => agentName(agentMap.get(id)),
             filterSummary: filterParts.length ? filterParts.join(' · ') : undefined,

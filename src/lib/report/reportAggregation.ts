@@ -2,6 +2,7 @@ import type { QuestionType, SurveyQuestion } from '@/domain/question';
 import type { ResponseLike } from '@/lib/analytics';
 import { isExcluded } from '@/lib/analytics';
 import type { SurveyReportConfig } from './reportConfig.types';
+import { isExcludedFromReport } from './reportPrivacy';
 import {
   buildDistribution,
   chiSquareIndependence,
@@ -343,6 +344,7 @@ export function aggregateReport(input: {
   const demographics = [...demoSet]
     .map((id) => qById.get(id))
     .filter(Boolean)
+    .filter((q) => !isExcludedFromReport(q!))
     .map((q) => analyze(q!, { demographic: true }));
 
   const sections = config.sections.map((sec) => ({
@@ -352,6 +354,7 @@ export function aggregateReport(input: {
     questions: sec.questionIds
       .map((id) => qById.get(id))
       .filter(Boolean)
+      .filter((q) => !isExcludedFromReport(q!))
       .map((q) =>
         analyze(q!, { horseRace: horseSet.has(q!.id), demographic: demoSet.has(q!.id) }),
       ),
@@ -365,7 +368,7 @@ export function aggregateReport(input: {
   const openTextSample = config.openTextSampleSize ?? 500;
   const openText = questions
     .filter((q) => q.type === 'long_text' || q.type === 'short_text')
-    .filter((q) => !q.id.includes('name') && !q.id.includes('phone') && !q.id.includes('mobile'))
+    .filter((q) => !isExcludedFromReport(q))
     .map((q) => {
       let texts = included
         .map((r) => answerValues(r, q.id)[0])
@@ -394,9 +397,9 @@ export function aggregateReport(input: {
   const crosstabs = crosstabsAll.filter((c) => c.significant);
   const crosstabsAppendix = crosstabsAll.filter((c) => !c.significant);
 
-  const appendix = questions.map((q) =>
-    analyze(q, { horseRace: horseSet.has(q.id), demographic: demoSet.has(q.id) }),
-  );
+  const appendix = questions
+    .filter((q) => !isExcludedFromReport(q))
+    .map((q) => analyze(q, { horseRace: horseSet.has(q.id), demographic: demoSet.has(q.id) }));
 
   return {
     meta: {
@@ -460,31 +463,53 @@ export function buildDefaultConfig(
   surveyTitle: string,
   questions: SurveyQuestion[],
 ): SurveyReportConfig {
-  const choiceIds = questions
+  const reportQs = questions.filter((q) => !isExcludedFromReport(q));
+  const choiceIds = reportQs
     .filter((q) =>
       ['single_choice', 'multiple_choice', 'yes_no', 'dropdown'].includes(q.type) ||
       q.type === 'rating' ||
       q.type === 'likert',
     )
     .map((q) => q.id);
+  const demographicQuestionIds = reportQs
+    .filter((q) =>
+      /age|gender|sex|education|school|occupation|livelihood|employment|marital|religion|faith|ward|village|region|county/i.test(
+        `${q.id} ${q.label}`,
+      ),
+    )
+    .map((q) => q.id);
+  const otherIds = reportQs
+    .map((q) => q.id)
+    .filter((id) => !demographicQuestionIds.includes(id));
+
+  const sections: SurveyReportConfig['sections'] = [];
+  if (demographicQuestionIds.length) {
+    sections.push({
+      id: 'demographics',
+      title: 'Demographic profile',
+      accent: '#1B4D3E',
+      questionIds: demographicQuestionIds,
+    });
+  }
+  if (otherIds.length) {
+    sections.push({
+      id: 'results',
+      title: 'Survey results',
+      accent: '#2C4A6E',
+      questionIds: otherIds,
+    });
+  }
+
   return {
     schemaVersion: 1,
     surveyId,
     title: surveyTitle,
     headlineQuestionIds: choiceIds.slice(0, 6),
-    demographicQuestionIds: questions
-      .filter((q) => /age|gender|education|occupation|ward|village|region/i.test(`${q.id} ${q.label}`))
-      .map((q) => q.id),
+    demographicQuestionIds,
     horseRaceQuestionIds: choiceIds.filter((id) =>
       /president|governor|senator|mp|mca|women|candidate|vote/i.test(id),
     ),
-    sections: [
-      {
-        id: 'all',
-        title: 'Survey results',
-        questionIds: questions.map((q) => q.id),
-      },
-    ],
+    sections,
     crosstabs: [],
     openTextSampleSize: 500,
   };

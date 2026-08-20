@@ -1,7 +1,10 @@
 /** Identity / free-text fields must not drive charts or demographic cross-tabs. */
 
 const ID_RE =
-  /(^|_)(name|full.?name|first.?name|last.?name|surname|phone|email|notes?|comment|respondent.?code|serial|national.?id|id.?number)($|_)/i;
+  /(^|_)(name|full.?name|first.?name|last.?name|surname|phone|mobile|email|notes?|comment|respondent.?code|serial|national.?id|id.?number)($|_)/i;
+
+/** Catch camelCase / glued ids like Q4Mobile, respondentPhone, pd_phone. */
+const PII_ANYWHERE_RE = /phone|mobile|cellphone|email|fullname|fullname|respondent.?code/i;
 
 const AGE_RE = /(^|_)(age|age.?group|years?.?old)($|_)/i;
 
@@ -18,7 +21,8 @@ export function isIdentityQuestion(q: {
   }
   const blob = `${qid} ${label}`;
   if (ID_RE.test(qid) || ID_RE.test(label.replace(/\s+/g, '_'))) return true;
-  if (/\b(name|phone|email|comment|notes?)\b/i.test(blob)) return true;
+  if (PII_ANYWHERE_RE.test(qid) || PII_ANYWHERE_RE.test(label)) return true;
+  if (/\b(name|phone|mobile|email|comment|notes?)\b/i.test(blob)) return true;
   return false;
 }
 

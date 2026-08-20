@@ -1,5 +1,7 @@
 import type { QuestionType } from '@/domain/question';
 import type { CrosstabResult, QuestionAnalysis } from './reportAggregation';
+import { redactSensitiveText } from './reportPrivacy';
+import { formatPctLabel } from './reportStats';
 import type { DistRow } from './reportStats';
 
 export type ChartKind =
@@ -64,15 +66,21 @@ export function horizontalBarSvg(
       const y = 12 + i * rowH;
       const bw = Math.max(2, (d.pct / maxPct) * (w - 180));
       const label = d.option.length > 28 ? `${d.option.slice(0, 26)}…` : d.option;
+      const safeLabel = redactSensitiveText(label);
       return `<g>
-        <text x="0" y="${y + 14}" font-size="10" fill="#1A2838">${escapeHtml(label)}</text>
+        <text x="0" y="${y + 14}" font-size="10" fill="#1A2838">${escapeHtml(safeLabel)}</text>
         <rect x="170" y="${y + 2}" width="${bw}" height="14" fill="${accent}" fill-opacity="0.85" rx="2"/>
-        <text x="${170 + bw + 6}" y="${y + 14}" font-size="9" fill="#5A6B7D" font-family="monospace">${d.pct}%</text>
+        <text x="${170 + bw + 6}" y="${y + 14}" font-size="9" fill="#5A6B7D" font-family="monospace">${d.pct > 0 ? `${d.pct}%` : formatPctLabel(d.count, data.reduce((s, x) => s + x.count, 0) || 1)}</text>
       </g>`;
     })
     .join('');
   const cap = opts.caption ? `<text x="0" y="${h - 4}" font-size="8" fill="#5A6B7D">${escapeHtml(opts.caption)}</text>` : '';
-  const foot = opts.showN !== false ? `<text x="0" y="${h - 4}" font-size="8" fill="#5A6B7D">Percentages shown; raw counts in appendix.</text>` : cap;
+  const foot =
+    opts.caption
+      ? cap
+      : opts.showN !== false
+        ? `<text x="0" y="${h - 4}" font-size="8" fill="#5A6B7D">Share of respondents (%)</text>`
+        : '';
   return `<svg viewBox="0 0 ${w} ${h}" width="100%" role="img" aria-label="Horizontal bar chart"><title>Bar chart</title>${bars}${foot}</svg>`;
 }
 
@@ -108,7 +116,8 @@ export function yesNoDonutSvg(items: DistRow[], accent = '#1B4D3E'): string {
         `<div class="legend-row"><span class="swatch" style="background:${i === 0 ? accent : '#D3DAE3'}"></span><span>${escapeHtml(d.option)}</span><span class="mono">${d.pct}%</span></div>`,
     )
     .join('');
-  return `<div class="pie-card">${`<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" role="img"><title>Yes/No distribution</title>${slices.join('')}<text x="${cx}" y="${cy}" text-anchor="middle" font-size="14" font-weight="600">${total}</text></svg>`}<div class="legend">${legend}</div></div>`;
+  const leadPct = sorted[0]?.pct ?? 0;
+  return `<div class="pie-card">${`<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" role="img"><title>Yes/No distribution</title>${slices.join('')}<text x="${cx}" y="${cy + 4}" text-anchor="middle" font-size="14" font-weight="600">${leadPct}%</text></svg>`}<div class="legend">${legend}</div></div>`;
 }
 
 export function crosstabHeatmapHtml(ct: CrosstabResult, accent: string): string {
@@ -147,7 +156,7 @@ export function renderQuestionChart(q: QuestionAnalysis, accent: string): string
   let chart = horizontalBarSvg(dist, { accent, caption, maxItems: kind === 'horizontal_bar_top8' ? 8 : undefined });
 
   if (q.isHorseRace && q.decidedDistribution?.length) {
-    chart += `<p class="meta" style="margin-top:8px"><strong>Among decided respondents</strong> (n=${q.decidedN}):</p>`;
+    chart += `<p class="meta" style="margin-top:8px"><strong>Among decided respondents</strong> (undecided excluded):</p>`;
     chart += horizontalBarSvg(topNWithOthers(q.decidedDistribution, 8), {
       accent,
       maxItems: 8,
@@ -157,14 +166,15 @@ export function renderQuestionChart(q: QuestionAnalysis, accent: string): string
   return chart;
 }
 
+/** Frequency table — percentages only (no raw counts). */
 export function frequencyTableHtml(items: DistRow[]): string {
   const sorted = [...items].sort((a, b) => b.count - a.count);
   const total = sorted.reduce((s, i) => s + i.count, 0) || 1;
   const rows = sorted
     .map(
       (i) =>
-        `<tr><td>${escapeHtml(i.option)}</td><td class="mono text-right">${i.count}</td><td class="mono text-right">${i.pct}%</td></tr>`,
+        `<tr><td>${escapeHtml(redactSensitiveText(i.option))}</td><td class="mono text-right">${formatPctLabel(i.count, total)}</td></tr>`,
     )
     .join('');
-  return `<table class="stats"><thead><tr><th>Response</th><th class="text-right">n</th><th class="text-right">%</th></tr></thead><tbody>${rows}<tr class="total-row"><td><strong>Total</strong></td><td class="mono text-right"><strong>${total}</strong></td><td></td></tr></tbody></table>`;
+  return `<table class="stats"><thead><tr><th>Response</th><th class="text-right">Share (%)</th></tr></thead><tbody>${rows}<tr class="total-row"><td><strong>Total</strong></td><td class="mono text-right"><strong>100%</strong></td></tr></tbody></table>`;
 }

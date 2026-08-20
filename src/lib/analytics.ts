@@ -7,6 +7,8 @@ import {
   isAgeNumberQuestion,
   isIdentityQuestion,
 } from './chartableQuestions';
+import { redactSensitiveText, REPORT_LTR_CSS, questionsForReport } from './report/reportPrivacy';
+import { formatPctLabel } from './report/reportStats';
 import type { RaceLeader, WardLeaderRow } from './researchInsights';
 
 export type ResponseLike = {
@@ -406,22 +408,25 @@ export function openPrintableReport(opts: {
       ? `${window.location.origin}/strategic-insight-logo.png`
       : '/strategic-insight-logo.png';
   const reportBundle = { ...bundle, perQuestion: bundle.perQuestion };
+  const safeOption = (option: string) => escapeHtml(redactSensitiveText(String(option)));
   const barsByPct = (items: { option: string; count: number; pct: number }[]) => {
     const safe = items.length ? items : [];
+    const total = safe.reduce((s, i) => s + i.count, 0) || 1;
     return safe
       .map(
         (i) =>
-          `<div class="bar-row"><div class="bar-label"><span>${escapeHtml(i.option)}</span><span class="mono">${i.count.toLocaleString()} (${i.pct}%)</span></div><div class="bar-track"><div class="bar-fill" style="width:${i.pct}%"></div></div></div>`,
+          `<div class="bar-row"><div class="bar-label"><span>${safeOption(i.option)}</span><span class="mono">${formatPctLabel(i.count, total)}</span></div><div class="bar-track"><div class="bar-fill" style="width:${i.pct}%"></div></div></div>`,
       )
       .join('');
   };
 
   const barsByCount = (items: { option: string; count: number; pct: number }[]) => {
     const max = Math.max(...items.map((x) => x.count), 1);
+    const total = items.reduce((s, i) => s + i.count, 0) || 1;
     return items
       .map((i) => {
         const w = Math.max(0, Math.round((i.count / max) * 100));
-        return `<div class="bar-row"><div class="bar-label"><span>${escapeHtml(i.option)}</span><span class="mono">${i.count.toLocaleString()} (${i.pct}%)</span></div><div class="bar-track"><div class="bar-fill" style="width:${w}%"></div></div></div>`;
+        return `<div class="bar-row"><div class="bar-label"><span>${safeOption(i.option)}</span><span class="mono">${formatPctLabel(i.count, total)}</span></div><div class="bar-track"><div class="bar-fill" style="width:${w}%"></div></div></div>`;
       })
       .join('');
   };
@@ -429,14 +434,15 @@ export function openPrintableReport(opts: {
   // Back-compat: older report sections call `bars(...)` expecting a percent-width bar.
   const bars = barsByPct;
 
-  /** SVG column chart for counts or percentages (client-style comparison). */
+  /** SVG column chart — percentages only. */
   const columnChart = (
     items: { option: string; count: number; pct: number }[],
-    metric: 'count' | 'pct',
+    _metric: 'count' | 'pct' = 'pct',
   ) => {
     if (!items.length) return '<p class="meta">No data</p>';
     const sorted = [...items].sort((a, b) => b.count - a.count);
-    const max = Math.max(...sorted.map((i) => (metric === 'count' ? i.count : i.pct)), 1);
+    const total = sorted.reduce((s, i) => s + i.count, 0) || 1;
+    const max = Math.max(...sorted.map((i) => i.pct), 1);
     const w = 520;
     const h = 200;
     const padL = 36;
@@ -449,15 +455,13 @@ export function openPrintableReport(opts: {
     const barW = Math.max(12, (plotW - gap * (sorted.length - 1)) / sorted.length);
     const barsSvg = sorted
       .map((item, idx) => {
-        const value = metric === 'count' ? item.count : item.pct;
-        const bh = Math.max(2, (value / max) * plotH);
+        const bh = Math.max(2, (item.pct / max) * plotH);
         const x = padL + idx * (barW + gap);
         const y = padT + plotH - bh;
-        const label =
-          item.option.length > 14
-            ? `${escapeHtml(item.option.slice(0, 12))}…`
-            : escapeHtml(item.option);
-        const valueLabel = metric === 'count' ? item.count.toLocaleString() : `${item.pct}%`;
+        const labelRaw =
+          item.option.length > 14 ? `${item.option.slice(0, 12)}…` : item.option;
+        const label = safeOption(labelRaw);
+        const valueLabel = formatPctLabel(item.count, total);
         return `<g>
           <rect x="${x}" y="${y}" width="${barW}" height="${bh}" fill="#5B9BD5" rx="2"/>
           <text x="${x + barW / 2}" y="${y - 4}" text-anchor="middle" font-size="9" fill="#1A2838">${valueLabel}</text>
@@ -476,24 +480,22 @@ export function openPrintableReport(opts: {
 
   const distributionTable = (items: { option: string; count: number; pct: number }[]) => {
     const sorted = [...items].sort((a, b) => b.count - a.count);
+    const total = sorted.reduce((s, i) => s + i.count, 0);
     const body = sorted
       .map(
         (i) =>
           `<tr>
-          <td>${escapeHtml(i.option)}</td>
-          <td class="mono text-right">${i.count.toLocaleString()}</td>
-          <td class="mono text-right">${i.pct}%</td>
+          <td>${safeOption(i.option)}</td>
+          <td class="mono text-right">${formatPctLabel(i.count, total || 1)}</td>
         </tr>`,
       )
       .join('');
-    const total = sorted.reduce((s, i) => s + i.count, 0);
     return `<table class="stats">
       <thead><tr>
-        <th>Label</th><th class="text-right">Count</th><th class="text-right">Percentage (%)</th>
+        <th>Label</th><th class="text-right">Share (%)</th>
       </tr></thead>
       <tbody>${body}
         <tr class="total-row"><td><strong>Total</strong></td>
-          <td class="mono text-right"><strong>${total.toLocaleString()}</strong></td>
           <td class="mono text-right"><strong>100%</strong></td></tr>
       </tbody></table>`;
   };
@@ -551,19 +553,20 @@ export function openPrintableReport(opts: {
     });
     const center =
       innerRatio > 0
-        ? `<text x="${cx}" y="${cy - 2}" text-anchor="middle" font-size="14" font-weight="600" fill="#1A2838">${total}</text>
-           <text x="${cx}" y="${cy + 10}" text-anchor="middle" font-size="8" fill="#5A6B7D">answers</text>`
+        ? `<text x="${cx}" y="${cy + 4}" text-anchor="middle" font-size="14" font-weight="600" fill="#1A2838">${items[0] ? formatPctLabel(items[0].count, total) : ''}</text>`
         : '';
     return `<svg class="pie-svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" role="img">${slices.join('')}${center}</svg>`;
   };
 
-  const chartLegend = (items: { option: string; count: number; pct: number }[]) =>
-    items
+  const chartLegend = (items: { option: string; count: number; pct: number }[]) => {
+    const total = items.reduce((s, i) => s + i.count, 0) || 1;
+    return items
       .map(
         (item, index) =>
-          `<div class="legend-row"><span class="swatch" style="background:${palette[index % palette.length]}"></span><span>${escapeHtml(item.option)}</span><span class="mono">${item.count.toLocaleString()} (${item.pct}%)</span></div>`,
+          `<div class="legend-row"><span class="swatch" style="background:${palette[index % palette.length]}"></span><span>${safeOption(item.option)}</span><span class="mono">${formatPctLabel(item.count, total)}</span></div>`,
       )
       .join('');
+  };
 
   const pieCard = (title: string, items: { option: string; count: number; pct: number }[], donut = false) => {
     const data = topNWithOther(items);
@@ -592,11 +595,11 @@ export function openPrintableReport(opts: {
           <div class="pie-card">${pieSvg(pieData, 150, 0.52)}<div class="legend">${chartLegend(pieData)}</div></div>
         </div>
         <div class="chart-panel">
-          <div class="chart-title">Bar chart — counts</div>
-          ${columnChart(sorted, 'count')}
+          <div class="chart-title">Bar chart — share (%)</div>
+          ${columnChart(sorted, 'pct')}
         </div>
       </div>
-      <div class="chart-title" style="margin-top:10px">Data table (sorted by count)</div>
+      <div class="chart-title" style="margin-top:10px">Data table (sorted by share)</div>
       ${distributionTable(sorted)}
       ${foot}
       ${insightBlock}`;
@@ -623,6 +626,10 @@ export function openPrintableReport(opts: {
       const typeLabel = q.type ? escapeHtml(String(q.type).replace(/_/g, ' ')) : q.kind;
       const header = `<div class="q-head"><span class="q-num">Q${index + 1}</span><h3>${escapeHtml(q.label)}</h3><span class="q-type">${typeLabel}</span></div>`;
 
+      if (isIdentityQuestion({ id: q.id, label: q.label, type: q.type })) {
+        return `<section class="question muted">${header}<p class="meta">Personal data omitted from report.</p></section>`;
+      }
+
       if (!q.count) {
         return `<section class="question muted"><div class="q-head"><span class="q-num">Q${index + 1}</span><h3>${escapeHtml(q.label)}</h3></div><p class="meta">No valid answers yet.</p></section>`;
       }
@@ -631,28 +638,24 @@ export function openPrintableReport(opts: {
         const distribution = q.distribution || [];
         const foot =
           q.type === 'multiple_choice'
-            ? '<p class="meta">Multiple selection — percentages are shares of all ticks, not respondents.</p>'
+            ? '<p class="meta">Multiple selection — percentages are shares of selections, not respondents.</p>'
             : '';
 
         return `<section class="question">${header}
-          <div class="meta">n=${q.count.toLocaleString()} · categorical · counts and % shown side by side</div>
+          <div class="meta">Share of respondents (%)</div>
           ${choiceBlock(distribution, foot, insightBlock)}
         </section>`;
       }
       if (q.kind === 'number') {
         const dist = q.distribution || [];
         return `<section class="question">${header}
-          <div class="meta">n=${q.count.toLocaleString()} · numeric / bands</div>
-          <table class="stats"><thead><tr><th>Valid n</th><th>Min</th><th>Mean</th><th>Median</th><th>Max</th></tr></thead><tbody><tr>
-            <td class="mono">${q.count}</td><td class="mono">${q.min ?? '—'}</td><td class="mono">${q.mean ?? '—'}</td>
-            <td class="mono">${q.median ?? '—'}</td><td class="mono">${q.max ?? '—'}</td>
-          </tr></tbody></table>
+          <div class="meta">Numeric / bands · share (%)</div>
           ${dist.length ? choiceBlock(dist, '', insightBlock) : insightBlock}
         </section>`;
       }
       if (q.kind === 'media' && (q.distribution?.length || 0) > 0) {
         return `<section class="question">${header}
-          <div class="meta">n=${q.count.toLocaleString()} · capture status</div>
+          <div class="meta">Capture status · share (%)</div>
           ${choiceBlock(q.distribution || [], '', insightBlock)}
         </section>`;
       }
@@ -660,19 +663,19 @@ export function openPrintableReport(opts: {
         const distribution = q.distribution || [];
         if (!distribution.length) {
           return `<section class="question">${header}
-            <div class="meta">n=${q.count.toLocaleString()} · ${q.kind === 'media' ? 'media capture' : 'open text'}</div>
+            <div class="meta">${q.kind === 'media' ? 'Media capture' : 'Open text'}</div>
             <p class="meta">Responses recorded — no chartable distribution for this field type.</p>
             ${insightBlock}
           </section>`;
         }
         return `<section class="question">${header}
-          <div class="meta">n=${q.count.toLocaleString()} · top verbatim answers (truncated)</div>
+          <div class="meta">Top responses · share (%)</div>
           ${choiceBlock(distribution, '', insightBlock)}
         </section>`;
       }
       if ((q.distribution?.length || 0) > 0) {
         return `<section class="question">${header}
-          <div class="meta">n=${q.count.toLocaleString()} · top responses</div>
+          <div class="meta">Top responses · share (%)</div>
           ${choiceBlock(q.distribution || [], '', insightBlock)}
         </section>`;
       }
@@ -695,29 +698,26 @@ export function openPrintableReport(opts: {
       .map(
         ([option, count]) =>
           `<tr><td>${escapeHtml(option)}</td>
-           <td class="mono text-right">${count.toLocaleString()}</td>
            <td class="mono text-right">${Math.round((count / total) * 100)}%</td></tr>`,
       )
       .join('');
-    return `<table class="stats"><thead><tr><th>${escapeHtml(title)}</th><th class="text-right">Count</th><th class="text-right">Percentage (%)</th></tr></thead><tbody>${rows}</tbody></table>`;
+    return `<table class="stats"><thead><tr><th>${escapeHtml(title)}</th><th class="text-right">Share (%)</th></tr></thead><tbody>${rows}</tbody></table>`;
   };
 
   const keyFindingsHtml =
     keyFindings && keyFindings.length
       ? `<h2>Key findings snapshot</h2>
-        <p class="meta">Leading answer for each question — count and percentage.</p>
+        <p class="meta">Leading answer for each question — share (%).</p>
         <table class="stats"><thead><tr>
-          <th>Question</th><th>Leading answer</th><th class="text-right">Count</th>
-          <th class="text-right">Percentage (%)</th><th class="text-right">Responses</th>
+          <th>Question</th><th>Leading answer</th>
+          <th class="text-right">Share (%)</th>
         </tr></thead><tbody>${keyFindings
           .map(
             (f) =>
               `<tr>
                 <td>${escapeHtml(f.question)}</td>
                 <td><strong>${escapeHtml(f.leader)}</strong></td>
-                <td class="mono text-right">${f.count.toLocaleString()}</td>
                 <td class="mono text-right">${f.pct}%</td>
-                <td class="mono text-right">${f.n.toLocaleString()}</td>
               </tr>`,
           )
           .join('')}</tbody></table>`
@@ -1006,15 +1006,15 @@ export function openPrintableReport(opts: {
         <h2>${escapeHtml(bq.label)}</h2>
         ${
           hasOverall
-            ? `<p class="meta">Overall leader: <strong>${escapeHtml(overall!.leader)}</strong> with ${overall!.leaderPct}% (n=${overall!.n})</p>
+            ? `<p class="meta">Overall leader: <strong>${escapeHtml(overall!.leader)}</strong> with ${overall!.leaderPct}%</p>
                <div class="chart-row">
                  <div class="chart-panel">
                    <div class="chart-title">Overall distribution</div>
                    <div class="pie-card">${pieSvg(pieData, 160, 0.52)}<div class="legend">${chartLegend(pieData)}</div></div>
                  </div>
                  <div class="chart-panel">
-                   <div class="chart-title">Counts</div>
-                   ${columnChart(sortedOverall.slice(0, 10), 'count')}
+                   <div class="chart-title">Share (%)</div>
+                   ${columnChart(sortedOverall.slice(0, 10), 'pct')}
                  </div>
                </div>
                ${distributionTable(sortedOverall)}`
@@ -1134,10 +1134,11 @@ export function openPrintableReport(opts: {
     )
     .join('');
 
-  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"/><title>${reportTitle} — Report</title>
+  const html = `<!DOCTYPE html><html lang="en" dir="ltr"><head><meta charset="utf-8"/><title>${reportTitle} — Report</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"/><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Instrument+Sans:wght@500;600;700&family=Source+Sans+3:wght@400;600&display=swap" rel="stylesheet"/>
 <style>
+  ${REPORT_LTR_CSS}
   @page {
     size: A4 portrait;
     margin: 0;
@@ -1292,7 +1293,9 @@ export function openMultiWardReport(opts: {
   agentName: (id: string) => string;
   questionInsights?: Record<string, string>;
 }): OpenHtmlReportResult {
-  const { surveyTitle, surveySubtitle, generatedAt, questions, allResponses, agentName, questionInsights } = opts;
+  const { surveyTitle, surveySubtitle, generatedAt, allResponses, agentName, questionInsights } = opts;
+  // Never include phone / name / email questions in ward reports.
+  const questions = questionsForReport(opts.questions);
   const logoSrc =
     typeof window !== 'undefined'
       ? `${window.location.origin}/strategic-insight-logo.png`
@@ -1317,6 +1320,7 @@ export function openMultiWardReport(opts: {
 
   const reportTitle = escapeHtml(surveyTitle);
   const reportDate = escapeHtml(generatedAt);
+  const safeOptionW = (option: string) => escapeHtml(redactSensitiveText(String(option)));
 
   // --- shared helpers (duplicated from openPrintableReport for self-containment) ---
   const palette = ['#1B4D3E', '#3D6B5C', '#A67C52', '#2C4A6E', '#8B3A2F', '#5A6B7D', '#6B8F71', '#2C3E50'];
@@ -1355,28 +1359,35 @@ export function openMultiWardReport(opts: {
       angle += slice;
       return `<path d="${path}" fill="${fill}" stroke="#fff" stroke-width="1"/>`;
     });
-    const center = `<text x="${cx}" y="${cy - 2}" text-anchor="middle" font-size="13" font-weight="600" fill="#1A2838">${total}</text><text x="${cx}" y="${cy + 10}" text-anchor="middle" font-size="8" fill="#5A6B7D">answers</text>`;
+    const center = `<text x="${cx}" y="${cy + 4}" text-anchor="middle" font-size="13" font-weight="600" fill="#1A2838">${items[0] ? formatPctLabel(items[0].count, total) : ''}</text>`;
     return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" role="img">${slices.join('')}${center}</svg>`;
   };
 
-  const legendW = (items: { option: string; count: number; pct: number }[]) =>
-    items.map((item, i) =>
-      `<div class="legend-row"><span class="swatch" style="background:${palette[i % palette.length]}"></span><span>${escapeHtml(item.option)}</span><span class="mono">${item.count} (${item.pct}%)</span></div>`
-    ).join('');
+  const legendW = (items: { option: string; count: number; pct: number }[]) => {
+    const total = items.reduce((s, i) => s + i.count, 0) || 1;
+    return items
+      .map(
+        (item, i) =>
+          `<div class="legend-row"><span class="swatch" style="background:${palette[i % palette.length]}"></span><span>${safeOptionW(item.option)}</span><span class="mono">${formatPctLabel(item.count, total)}</span></div>`,
+      )
+      .join('');
+  };
 
   const colChartW = (items: { option: string; count: number; pct: number }[]) => {
     if (!items.length) return '<p class="meta">No data</p>';
     const sorted = [...items].sort((a, b) => b.count - a.count);
-    const max = Math.max(...sorted.map(i => i.count), 1);
+    const total = sorted.reduce((s, i) => s + i.count, 0) || 1;
+    const max = Math.max(...sorted.map((i) => i.pct), 1);
     const w = 400; const h = 160; const padL = 30; const padR = 10; const padT = 12; const padB = 48;
     const plotW = w - padL - padR; const plotH = h - padT - padB;
     const gap = 6;
     const barW = Math.max(10, (plotW - gap * (sorted.length - 1)) / sorted.length);
     const barsSvg = sorted.map((item, idx) => {
-      const bh = Math.max(2, (item.count / max) * plotH);
+      const bh = Math.max(2, (item.pct / max) * plotH);
       const x = padL + idx * (barW + gap); const y = padT + plotH - bh;
-      const label = item.option.length > 12 ? `${escapeHtml(item.option.slice(0, 10))}…` : escapeHtml(item.option);
-      return `<g><rect x="${x}" y="${y}" width="${barW}" height="${bh}" fill="#5B9BD5" rx="2"/><text x="${x + barW / 2}" y="${y - 3}" text-anchor="middle" font-size="8" fill="#1A2838">${item.count}</text><text x="${x + barW / 2}" y="${h - 6}" text-anchor="middle" font-size="7" fill="#5A6B7D" transform="rotate(-25 ${x + barW / 2} ${h - 6})">${label}</text></g>`;
+      const labelRaw = item.option.length > 12 ? `${item.option.slice(0, 10)}…` : item.option;
+      const label = safeOptionW(labelRaw);
+      return `<g><rect x="${x}" y="${y}" width="${barW}" height="${bh}" fill="#5B9BD5" rx="2"/><text x="${x + barW / 2}" y="${y - 3}" text-anchor="middle" font-size="8" fill="#1A2838">${formatPctLabel(item.count, total)}</text><text x="${x + barW / 2}" y="${h - 6}" text-anchor="middle" font-size="7" fill="#5A6B7D" transform="rotate(-25 ${x + barW / 2} ${h - 6})">${label}</text></g>`;
     }).join('');
     const grid = [0.25, 0.5, 0.75, 1].map(t => {
       const y = padT + plotH * (1 - t);
@@ -1388,9 +1399,9 @@ export function openMultiWardReport(opts: {
   const distTableW = (items: { option: string; count: number; pct: number }[]) => {
     const sorted = [...items].sort((a, b) => b.count - a.count);
     const total = sorted.reduce((s, i) => s + i.count, 0);
-    return `<table class="stats"><thead><tr><th>Option</th><th class="text-right">Count</th><th class="text-right">%</th></tr></thead><tbody>${
-      sorted.map(i => `<tr><td>${escapeHtml(i.option)}</td><td class="mono text-right">${i.count}</td><td class="mono text-right">${i.pct}%</td></tr>`).join('')
-    }<tr class="total-row"><td><strong>Total</strong></td><td class="mono text-right"><strong>${total}</strong></td><td class="mono text-right"><strong>100%</strong></td></tr></tbody></table>`;
+    return `<table class="stats"><thead><tr><th>Option</th><th class="text-right">Share (%)</th></tr></thead><tbody>${
+      sorted.map(i => `<tr><td>${safeOptionW(i.option)}</td><td class="mono text-right">${formatPctLabel(i.count, total || 1)}</td></tr>`).join('')
+    }<tr class="total-row"><td><strong>Total</strong></td><td class="mono text-right"><strong>100%</strong></td></tr></tbody></table>`;
   };
 
   // Build pages for all wards combined
@@ -1412,11 +1423,11 @@ export function openMultiWardReport(opts: {
         </div>
       </header>
       <h2>Wards included in this report</h2>
-      <table class="stats"><thead><tr><th>Ward</th><th class="text-right">Responses</th><th class="text-right">Share %</th></tr></thead><tbody>
+      <table class="stats"><thead><tr><th>Ward</th><th class="text-right">Share %</th></tr></thead><tbody>
       ${(() => {
         const total = Object.values(wardCounts).reduce((s, c) => s + c, 0) || 1;
         return wards.map(w =>
-          `<tr><td>${escapeHtml(w)}</td><td class="mono text-right">${wardCounts[w]}</td><td class="mono text-right">${Math.round((wardCounts[w] / total) * 100)}%</td></tr>`
+          `<tr><td>${escapeHtml(w)}</td><td class="mono text-right">${Math.round((wardCounts[w] / total) * 100)}%</td></tr>`
         ).join('');
       })()}
       </tbody></table>`,
@@ -1469,13 +1480,13 @@ export function openMultiWardReport(opts: {
       const insight = wardInsight[q.id]
         ? `<p class="note" style="margin-top:6px"><strong>Insight:</strong> ${escapeHtml(wardInsight[q.id])}</p>`
         : '';
-      if (!dist.length) return `<section class="question muted"><div class="q-head"><span class="q-num">Q${idx + 1}</span><h3>${escapeHtml(String(q.label))}</h3></div><p class="meta">n=${count} — no chartable data.</p>${insight}</section>`;
+      if (!dist.length) return `<section class="question muted"><div class="q-head"><span class="q-num">Q${idx + 1}</span><h3>${escapeHtml(String(q.label))}</h3></div><p class="meta">No chartable data.</p>${insight}</section>`;
       return `<section class="question">
         <div class="q-head"><span class="q-num">Q${idx + 1}</span><h3>${escapeHtml(String(q.label))}</h3></div>
-        <div class="meta">n=${count}</div>
+        <div class="meta">Share of respondents (%)</div>
         <div class="chart-row">
           <div class="chart-panel"><div class="chart-title">Share (%)</div><div class="pie-card">${pieSvgW(dist, 130)}<div class="legend">${legendW(dist)}</div></div></div>
-          <div class="chart-panel"><div class="chart-title">Counts</div>${colChartW(distribution.slice(0, 12))}</div>
+          <div class="chart-panel"><div class="chart-title">Share (%)</div>${colChartW(distribution.slice(0, 12))}</div>
         </div>
         ${distTableW(distribution)}
         ${insight}
@@ -1498,8 +1509,8 @@ export function openMultiWardReport(opts: {
         </div>
         <h2>Field team</h2>
         ${agentDist.length
-          ? `<table class="stats"><thead><tr><th>Agent</th><th class="text-right">Interviews</th><th class="text-right">%</th></tr></thead><tbody>${
-              agentDist.map(a => `<tr><td>${escapeHtml(a.option)}</td><td class="mono text-right">${a.count}</td><td class="mono text-right">${a.pct}%</td></tr>`).join('')
+          ? `<table class="stats"><thead><tr><th>Agent</th><th class="text-right">Share %</th></tr></thead><tbody>${
+              agentDist.map(a => `<tr><td>${escapeHtml(a.option)}</td><td class="mono text-right">${a.pct}%</td></tr>`).join('')
             }</tbody></table>`
           : '<p class="meta">No agent data.</p>'}`,
     });
@@ -1535,10 +1546,11 @@ export function openMultiWardReport(opts: {
       </footer>
     </article>`).join('');
 
-  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"/><title>${reportTitle} — Ward Report</title>
+  const html = `<!DOCTYPE html><html lang="en" dir="ltr"><head><meta charset="utf-8"/><title>${reportTitle} — Ward Report</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"/><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Instrument+Sans:wght@500;600;700&family=Source+Sans+3:wght@400;600&display=swap" rel="stylesheet"/>
 <style>
+  ${REPORT_LTR_CSS}
   @page { size: A4 portrait; margin: 0; }
   * { box-sizing: border-box; }
   body { font-family: "Source Sans 3", system-ui, sans-serif; color: #1A2838; font-size: 11px; line-height: 1.4; margin: 0; padding: 0; background: #fff; }

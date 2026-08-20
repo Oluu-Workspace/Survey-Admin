@@ -138,6 +138,14 @@ export function buildDistribution(
     .sort((a, b) => b.count - a.count);
 }
 
+/** Percent label that avoids misleading 0% when count > 0. */
+export function formatPctLabel(count: number, total: number): string {
+  if (total <= 0 || count <= 0) return '0%';
+  const raw = (count / total) * 100;
+  if (raw > 0 && raw < 0.5) return '<1%';
+  return `${Math.round(raw)}%`;
+}
+
 /** Approximate normal CDF (Abramowitz & Stegun). */
 function normalCdf(x: number): number {
   const t = 1 / (1 + 0.2316419 * Math.abs(x));

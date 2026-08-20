@@ -1,5 +1,6 @@
 import type { AggregatedReport, QuestionAnalysis } from './reportAggregation';
 import type { SurveyReportConfig } from './reportConfig.types';
+import { redactSensitiveText, REPORT_LTR_CSS } from './reportPrivacy';
 import {
   crosstabHeatmapHtml,
   frequencyTableHtml,
@@ -22,15 +23,15 @@ function statCard(value: string, label: string, accent: string) {
   </div>`;
 }
 
-function questionBlock(q: QuestionAnalysis, accent: string, sectionTitle: string) {
+function questionBlock(q: QuestionAnalysis, accent: string, _sectionTitle: string) {
   const chart = renderQuestionChart(q, accent);
   const leadNote =
     q.isHorseRace && q.decidedN != null
-      ? `<p class="meta">All respondents (n=${q.n}); decided-only breakdown shown where applicable.</p>`
+      ? `<p class="meta">All respondents and decided-only breakdown shown where applicable.</p>`
       : '';
   return `<article class="question-block page-break" id="q-${esc(q.id)}">
     <h3>${esc(q.label)}</h3>
-    <p class="meta">Question type: ${esc(q.type)} · Valid n=${q.n}</p>
+    <p class="meta">${esc(q.type.replace(/_/g, ' '))}</p>
     ${leadNote}
     <div class="chart-wrap" role="figure" aria-label="Chart for ${esc(q.label)}">${chart}</div>
   </article>`;
@@ -155,7 +156,7 @@ export function renderAnalyticalReportHtml(
           .slice(0, 5)
           .map(
             (t) =>
-              `<div class="quote-block"><strong>${esc(t.theme)}</strong> (${t.pct}%)<blockquote>${t.quotes.map((q) => esc(q)).join('</blockquote><blockquote>')}</blockquote></div>`,
+              `<div class="quote-block"><strong>${esc(t.theme)}</strong> (${t.pct}%)<blockquote>${t.quotes.map((q) => esc(redactSensitiveText(q))).join('</blockquote><blockquote>')}</blockquote></div>`,
           )
           .join('');
         const words = horizontalBarSvg(ot.wordFreq.slice(0, 15), {
@@ -230,7 +231,7 @@ export function renderAnalyticalReportHtml(
 
   const appendixSection = `<section class="report-section appendix page-break" id="full-appendix">
     <h1>Full appendix</h1>
-    <p class="meta">Complete question text and frequency tables. Raw counts shown; percentages in main body.</p>
+    <p class="meta">Complete question text and percentage tables for every item.</p>
     ${report.crosstabsAppendix
       .map(
         (ct) =>
@@ -242,7 +243,7 @@ export function renderAnalyticalReportHtml(
         (q) =>
           `<article class="question-block page-break" id="app-${esc(q.id)}">
         <h3>${esc(q.label)}</h3>
-        <p class="meta">${esc(q.type)} · n=${q.n} · non-response ${q.nonResponseRate}%</p>
+        <p class="meta">${esc(q.type.replace(/_/g, ' '))}${q.nonResponseRate > 0 ? ` · non-response ${q.nonResponseRate}%` : ''}</p>
         ${frequencyTableHtml(q.distribution)}
       </article>`,
       )
@@ -254,59 +255,84 @@ export function renderAnalyticalReportHtml(
     : 'Results are <strong>unweighted</strong> — raw sample proportions.';
 
   return `<!DOCTYPE html>
-<html lang="en">
+<html lang="en" dir="ltr">
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>${esc(meta.title)} — Analytical Report</title>
 <style>
-  @page { size: A4 portrait; margin: 18mm 16mm 22mm 16mm; }
+  ${REPORT_LTR_CSS}
+  @page { size: A4 portrait; margin: 24mm 20mm 28mm 20mm; }
   @media print {
     .no-print { display: none !important; }
     .page-break { break-before: page; page-break-before: always; }
-    .running-header, .running-footer { position: fixed; left: 0; right: 0; }
-    .running-header { top: 0; }
-    .running-footer { bottom: 0; }
+    body { padding: 0; }
+    main {
+      max-width: none;
+      margin: 0;
+      padding: 0;
+    }
+    .running-header {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 14mm;
+      padding: 3mm 20mm;
+      background: #fff;
+    }
+    .running-footer {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 12mm;
+      padding: 2mm 20mm;
+      background: #fff;
+    }
+    .report-section, .cover, #toc { padding-left: 0; padding-right: 0; }
   }
   * { box-sizing: border-box; }
-  body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; color: #1A2838; line-height: 1.45; font-size: 11pt; margin: 0; padding: 0; }
-  .running-header { display: flex; justify-content: space-between; font-size: 8pt; color: #5A6B7D; border-bottom: 1px solid #D3DAE3; padding: 6px 16mm; background: #fff; }
-  .running-footer { display: flex; justify-content: space-between; font-size: 7pt; color: #5A6B7D; border-top: 1px solid #D3DAE3; padding: 6px 16mm; background: #fff; }
-  main { max-width: 720px; margin: 0 auto; padding: 48px 24px 64px; }
-  h1 { font-size: 18pt; font-weight: 600; margin: 0 0 16px; padding-bottom: 8px; border-bottom: 3px solid ${accentDefault}; }
-  h2 { font-size: 13pt; margin: 24px 0 12px; }
-  h3 { font-size: 12pt; margin: 16px 0 8px; }
-  h4 { font-size: 10pt; margin: 12px 0 6px; color: #5A6B7D; }
-  .cover { text-align: center; padding: 48px 0; min-height: 80vh; display: flex; flex-direction: column; justify-content: center; }
-  .cover img { max-height: 64px; margin-bottom: 24px; }
-  .cover h1 { border: none; font-size: 22pt; }
-  .cover-meta { color: #5A6B7D; font-size: 10pt; margin: 8px 0; }
-  .confidential { margin-top: 32px; font-size: 9pt; color: #8B3A2F; border: 1px solid #E8D5D2; padding: 12px; border-radius: 4px; }
-  .stat-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin: 16px 0 24px; }
-  .stat-card { background: #F7F9FB; border-radius: 6px; padding: 14px; }
-  .stat-value { font-size: 14pt; font-weight: 700; line-height: 1.2; }
-  .stat-label { font-size: 8pt; color: #5A6B7D; margin-top: 6px; }
-  .meta { font-size: 9pt; color: #5A6B7D; }
-  .note { font-size: 9pt; background: #FFF8E6; border-left: 3px solid #A67C52; padding: 8px 12px; margin: 12px 0; }
-  table.stats { width: 100%; border-collapse: collapse; font-size: 9pt; margin: 12px 0; }
-  table.stats th, table.stats td { border: 1px solid #D3DAE3; padding: 6px 8px; text-align: left; }
+  body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; color: #1A2838; line-height: 1.5; font-size: 11pt; margin: 0; padding: 0; background: #fff; }
+  .running-header { display: flex; justify-content: space-between; align-items: center; font-size: 8pt; color: #5A6B7D; border-bottom: 1px solid #D3DAE3; padding: 10px 24px; background: #fff; }
+  .running-footer { display: flex; justify-content: space-between; align-items: center; font-size: 7pt; color: #5A6B7D; border-top: 1px solid #D3DAE3; padding: 8px 24px; background: #fff; }
+  main { max-width: 680px; margin: 0 auto; padding: 56px 32px 72px; }
+  h1 { font-size: 18pt; font-weight: 600; margin: 0 0 20px; padding-bottom: 10px; border-bottom: 3px solid ${accentDefault}; }
+  h2 { font-size: 13pt; margin: 28px 0 14px; }
+  h3 { font-size: 12pt; margin: 20px 0 10px; }
+  h4 { font-size: 10pt; margin: 14px 0 8px; color: #5A6B7D; }
+  .cover { text-align: center; padding: 64px 16px; min-height: 85vh; display: flex; flex-direction: column; justify-content: center; }
+  .cover img { max-height: 64px; margin-bottom: 28px; }
+  .cover h1 { border: none; font-size: 22pt; margin-bottom: 12px; }
+  .cover-meta { color: #5A6B7D; font-size: 10pt; margin: 10px 0; }
+  .confidential { margin-top: 36px; font-size: 9pt; color: #8B3A2F; border: 1px solid #E8D5D2; padding: 14px 16px; border-radius: 4px; }
+  .stat-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 14px; margin: 20px 0 28px; }
+  .stat-card { background: #F7F9FB; border-radius: 6px; padding: 16px; }
+  .stat-value { font-size: 14pt; font-weight: 700; line-height: 1.25; }
+  .stat-label { font-size: 8pt; color: #5A6B7D; margin-top: 8px; }
+  .meta { font-size: 9pt; color: #5A6B7D; margin: 8px 0; }
+  .note { font-size: 9pt; background: #FFF8E6; border-left: 3px solid #A67C52; padding: 10px 14px; margin: 14px 0; }
+  table.stats { width: 100%; border-collapse: collapse; font-size: 9pt; margin: 14px 0; }
+  table.stats th, table.stats td { border: 1px solid #D3DAE3; padding: 8px 10px; text-align: left; vertical-align: top; }
   table.stats th { background: #F0F3F7; font-weight: 600; }
   .text-right { text-align: right; }
   .mono { font-family: ui-monospace, monospace; }
   .total-row td { background: #F7F9FB; }
-  .chart-wrap { margin: 12px 0 20px; }
+  .chart-wrap { margin: 16px 0 24px; }
+  .question-block { margin-bottom: 32px; }
+  .report-section { margin-bottom: 24px; }
   .pie-card { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
   .legend-row { display: flex; gap: 8px; align-items: center; font-size: 9pt; margin: 4px 0; }
   .swatch { width: 12px; height: 12px; border-radius: 2px; display: inline-block; }
-  .quote-block { margin: 12px 0; font-size: 9pt; }
-  blockquote { margin: 6px 0 6px 12px; padding-left: 10px; border-left: 2px solid #D3DAE3; color: #3D4F63; font-style: italic; }
-  .toc { list-style: none; padding: 0; }
-  .toc li { margin: 6px 0; }
+  .quote-block { margin: 14px 0; font-size: 9pt; }
+  blockquote { margin: 8px 0 8px 12px; padding-left: 12px; border-left: 2px solid #D3DAE3; color: #3D4F63; font-style: italic; }
+  .toc { list-style: none; padding: 0; margin: 16px 0; }
+  .toc li { margin: 8px 0; }
   .toc a { color: #1B4D3E; text-decoration: none; }
   .toc-l2 { margin-left: 16px; font-size: 9pt; }
   .appendix h1 { border-color: #5A6B7D; }
-  .print-hint { position: fixed; top: 12px; right: 12px; background: #1B4D3E; color: #fff; padding: 10px 16px; border-radius: 6px; font-size: 10pt; cursor: pointer; z-index: 99; }
-  svg { max-width: 100%; height: auto; }
+  .print-hint { position: fixed; top: 12px; right: 12px; background: #1B4D3E; color: #fff; padding: 10px 16px; border-radius: 6px; font-size: 10pt; cursor: pointer; z-index: 99; border: none; }
+  svg { max-width: 100%; height: auto; display: block; }
   @media print {
     svg rect { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   }
